@@ -1,0 +1,9 @@
+pub mod defs;
+pub mod bitbrd;
+//pub mod atktbl;
+pub mod movgen;
+pub mod pos;
+pub mod mkmv;
+pub mod perft;
+pub mod magics;
+pub mod magic_table;
