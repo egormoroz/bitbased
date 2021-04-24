@@ -319,33 +319,31 @@ impl Position {
         }
     }
 
+
     // #[inline(never)]
     pub fn in_check(&self, us: usize) -> bool {
         let them = us ^ 1;
         let mask = self.pieces[us][KINGX];
         let sq = mask.trailing_zeros() as usize;
+        let mut bb = 0;
+
         if them == WHITEX {
             let pwns = self.pieces[WHITEX][PAWNX];
-            if ((pwns & !FILE_A) << 7 | (pwns & !FILE_H) << 9) & mask != 0 { return true }
+            bb |= (pwns & !FILE_A) << 7 | (pwns & !FILE_H) << 9;
         } else {
             let pwns = self.pieces[BLACKX][PAWNX];
-            if ((pwns & !FILE_A) >> 9 | (pwns & !FILE_H) >> 7) & mask != 0 { return true }
+            bb |= (pwns & !FILE_A) >> 9 | (pwns & !FILE_H) >> 7;
         }
-
-        // if knight_attacks(self.pieces[them][KNIGHTX]) & mask != 0 { return true }
-        
-        for sq in self.pieces[them][KNIGHTX].bits() {
-            if ATTK_TBL.knight_attacks(sq as usize) & mask != 0 { return true }
-        }
-        for sq in self.pieces[them][KINGX].bits() {
-            if ATTK_TBL.king_attacks(sq as usize) & mask != 0 { return true }
-        }
+        bb &= mask;
+        bb |= ATTK_TBL.knight_attacks(sq) & self.pieces[them][KNIGHTX];
+        bb |= ATTK_TBL.king_attacks(sq) & self.pieces[them][KINGX];
 
         let blockers = self.all_ocupied();
         let bp = ATTK_TBL.bishop_attacks(sq, blockers);
         let rk = ATTK_TBL.rook_attacks(sq, blockers);
-        (bp & self.pieces[them][BISHOPX] | rk & self.pieces[them][ROOKX]
-        | ((bp | rk) & self.pieces[them][QUEENX])) != 0
+        bb |= bp & self.pieces[them][BISHOPX] | rk & self.pieces[them][ROOKX];
+        bb |= (bp | rk) & self.pieces[them][QUEENX];
+        bb != 0
     }
 
     pub fn attacked(&self, sidex: usize) -> BitBoard {
