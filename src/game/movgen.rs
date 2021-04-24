@@ -123,16 +123,6 @@ impl MoveList {
     }
 }
 
-fn knight_attacks(knights: BitBoard) -> BitBoard {
-   let l1 = (knights >> 1) & 0x7f7f7f7f7f7f7f7f;
-   let l2 = (knights >> 2) & 0x3f3f3f3f3f3f3f3f;
-   let r1 = (knights << 1) & 0xfefefefefefefefe;
-   let r2 = (knights << 2) & 0xfcfcfcfcfcfcfcfc;
-   let h1 = l1 | r1;
-   let h2 = l2 | r2;
-   return (h1<<16) | (h1>>16) | (h2<<8) | (h2>>8);
-}
-
 impl Position {
     fn gen_proms<const CAP: bool>(&self, from: u8, to: u8, moves: &mut MoveList) {
         for tp in KNIGHT..=QUEEN {
@@ -281,7 +271,6 @@ impl Position {
         }
     }
 
-
     pub fn gen_queen_moves(&self, moves: &mut MoveList) {
         let blockers = self.all_ocupied();
         let free  = !blockers;
@@ -358,37 +347,6 @@ impl Position {
         (bp & self.pieces[them][BISHOPX] | rk & self.pieces[them][ROOKX]
         | ((bp | rk) & self.pieces[them][QUEENX])) != 0
     }
-/* 
-    pub fn sqattacked(&self, sidex: usize, sq: u8) -> bool {
-        let mask = 1<<sq;
-        if sidex == WHITEX {
-            let pwns = self.pieces[WHITEX][PAWNX];
-            if ((pwns & !FILE_A) << 7 | (pwns & !FILE_H) << 9) & mask != 0 { return true }
-        } else {
-            let pwns = self.pieces[BLACKX][PAWNX];
-            if (pwns & !FILE_A) >> 9 | (pwns & !FILE_H) >> 7 != 0 { return true }
-        }
-
-        for sq in self.pieces[sidex][KNIGHTX].bits() {
-            if ATTK_TBL.knight_attacks(sq as usize) & mask != 0 { return true }
-        }
-        for sq in self.pieces[sidex][KINGX].bits() {
-            if ATTK_TBL.king_attacks(sq as usize) & mask != 0 { return true }
-        }
-        let blockers = self.all_ocupied();
-        for sq in self.pieces[sidex][BISHOPX].bits() {
-            if ATTK_TBL.bishop_attacks(sq as usize, blockers) & mask != 0 { return true }
-        }
-        for sq in self.pieces[sidex][ROOKX].bits() {
-            if ATTK_TBL.rook_attacks(sq as usize, blockers) & mask != 0 { return true }
-        }
-        for sq in self.pieces[sidex][QUEENX].bits() {
-            if (ATTK_TBL.bishop_attacks(sq as usize, blockers) 
-                | ATTK_TBL.rook_attacks(sq as usize, blockers)) & mask != 0 { return true }
-        }
-        false
-    }
-*/
 
     pub fn attacked(&self, sidex: usize) -> BitBoard {
         let mut bb = 0;

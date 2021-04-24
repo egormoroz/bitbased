@@ -1,4 +1,4 @@
-use super::{magic_table::AttackTable, movgen::*, pos::*};
+use super::{movgen::*, pos::*};
 
 pub const POSITIONS: [&'static str; 6] = [
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
