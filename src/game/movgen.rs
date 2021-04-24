@@ -6,8 +6,8 @@ use std::fmt;
 
 const CAPTURE_BASE: u16 = 10000;
 const PROM_BASE: u16 = 8000;
-// const KILLER_BASE_CUR: u16 = 5000;
-// const KILLER_BASE_PREV: u16 = 4500;
+const KILLER_BASE_CUR: u16 = 5000;
+const KILLER_BASE_PREV: u16 = 4500;
 
 lazy_static! {
     pub static ref ATTK_TBL: Box<AttackTable> = AttackTable::new();
@@ -148,7 +148,13 @@ impl MoveList {
             let vic = p.board[m.to() as usize].get_type() as u16;
             (vic + 1) * 100 + 6 - (ATK as u16+1) + CAPTURE_BASE
         } else {
-            0
+            if p.search_killers[0][p.ply as usize] == m {
+                KILLER_BASE_CUR
+            } else if p.search_killers[1][p.ply as usize] == m {
+                KILLER_BASE_PREV
+            } else {
+                p.search_hist[p.board[m.from() as usize].id() as usize][m.to() as usize]
+            }
         };
         self.moves[self.n] = OrderedMove(m, score);
         self.n += 1;

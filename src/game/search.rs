@@ -91,14 +91,13 @@ impl Position {
             for m in self.pv_line.iter() {
                 print!(" {}", m);
             }
-            println!()
+            println!(" // Ordering: {:.2}", info.fhf / info.fh);
         }
         if let Some(m) = self.pv_line.iter().next() {
             println!("bestmove {}", m);
         } else {
             println!("no legal moves");
         }
-        println!("Ordering: {:.2}", info.fhf / info.fh);
     }
 
     fn alpha_beta(&mut self, mut alpha: i32, beta: i32, depth: u8, info: &mut SearchInfo) -> i32 {
@@ -141,10 +140,19 @@ impl Position {
                     }
                     info.fh += 1.;
 
+                    if !m.cap() {
+                        self.search_killers[1][self.ply as usize] = self.search_killers[0][self.ply as usize];
+                        self.search_killers[0][self.ply as usize] = m;
+                    }
+
                     return beta;
                 }
                 alpha = score;
                 self.store_pv_move(m);
+
+                if !m.cap() {
+                    self.search_hist[self.board[m.from() as usize].id() as usize][m.to() as usize] += depth as u16;
+                }
             }
         }
 

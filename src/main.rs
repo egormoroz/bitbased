@@ -37,7 +37,7 @@ fn main() {
         io::stdin().read_line(&mut buf).unwrap();
         match buf.trim() {
             "q" => break,
-            "s" => b.search(&mut SearchInfo::new(9, None)),
+            "s" => b.search(&mut SearchInfo::new(8, None)),
             "t" => { b.unmake_move(); continue; },
             _ => (),
         }

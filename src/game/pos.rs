@@ -124,6 +124,9 @@ pub struct Position {
     pub ply: u16,
     pub pv_line: PVLine,
     pub pv_table: PVTable,
+
+    pub search_hist: [[u16; 64]; 12],
+    pub search_killers: [[Move; MAX_DEPTH]; 2],
 }
 
 impl Position {
@@ -144,6 +147,9 @@ impl Position {
             ply: 0,
             pv_line: PVLine::new(),
             pv_table: PVTable::new(),
+
+            search_hist: [[0; 64]; 12],
+            search_killers: [[Move::new(); MAX_DEPTH]; 2],
         }
     }
 
