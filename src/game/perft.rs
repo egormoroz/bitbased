@@ -44,7 +44,7 @@ mod tests {
         super::perft(&mut Position::from_fen(POSITIONS[p]).unwrap(), depth as u8)
     }
 
-    const N: usize = 5;
+    const N: usize = 4;
 
     #[test]
     fn position_one() {

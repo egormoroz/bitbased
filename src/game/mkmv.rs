@@ -1,4 +1,4 @@
-use super::{defs::*, movgen::*, pos::*};
+use super::{defs::*, movgen::*, pos::*, zobrist::*};
 
 const KING_MASK: [u64; 2] = [ 7 << 4, 7 << 60 ]; //TODO: Check this!
 const QUEEN_MASK: [u64; 2] = [ 7 << 2, 7 << 58 ]; //and this!
@@ -59,6 +59,10 @@ impl Position {
         self.hist_ply += 1;
         self.turn ^= 1;
 
+        self.key ^= ZOBRIST.castling(hist.cas) ^ ZOBRIST.castling(self.cas)
+            ^ ZOBRIST.side() ^ ZOBRIST.en_passant(hist.ep) ^ ZOBRIST.en_passant(self.ep);
+
+        // self.verify();
         if self.in_check(turnx) { 
             self.unmake_move();
             false
@@ -74,11 +78,15 @@ impl Position {
         self.hist_ply -= 1;
         let hist = self.hist[self.hist_ply as usize];
         let m  = hist.m;
+        
+        self.key ^= ZOBRIST.castling(hist.cas) ^ ZOBRIST.castling(self.cas)
+            ^ ZOBRIST.side() ^ ZOBRIST.en_passant(hist.ep) ^ ZOBRIST.en_passant(self.ep);
+
         self.ep = hist.ep;
         self.cas = hist.cas;
+
         let (kind, f, t) = (m.kind(), m.from(), m.to());
         let turnx = self.turnx();
-
         if kind.en_passant() {
             if self.turn == WHITE {
                 self.add_piece(BLACKX, PAWNX, self.ep - 8);
@@ -104,5 +112,6 @@ impl Position {
                 self.add_piece(turnx ^ 1, hist.cap.get_type() as usize, t);
             }
         }
+        // self.verify();
     }
 }

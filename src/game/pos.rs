@@ -1,4 +1,4 @@
-use super::{bitbrd::*, defs::*, movgen::*};
+use super::{bitbrd::*, defs::*, movgen::*, zobrist::ZOBRIST};
 use std::{fmt, str::FromStr};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece(u8);
@@ -113,6 +113,7 @@ pub struct Position {
     pub ep: u8,
     pub turn: u8,
     pub cas: CastlingPerm,
+    pub key: u64,
 }
 
 impl Position {
@@ -121,12 +122,13 @@ impl Position {
             board: [Piece::none(); 64],
             pieces: [[0; 6]; 2],
             occupied: [0; 2],
-
+            
             hist: [Hist::new(); MAX_HIST],
             hist_ply: 0,
             ep: NS,
             turn: WHITE,
             cas: CastlingPerm::new(),
+            key: 0,
         }
     }
 
@@ -162,6 +164,7 @@ impl Position {
                 assert!(!self.all_ocupied().chk(sq));
             }
         }
+        assert_eq!(self.key, ZOBRIST.gen_key(self));
     }
 
     pub fn do_castling(&mut self, f: u8, t: u8) {
@@ -175,9 +178,11 @@ impl Position {
     }
 
     pub fn add_piece(&mut self, side: usize, px: usize, sq: u8) {
-        self.board[sq as usize] = Piece::new(px as u8, side as u8);
+        let p = Piece::new(px as u8, side as u8);
+        self.board[sq as usize] = p;
         self.occupied[side].set(sq);
         self.pieces[side][px].set(sq);
+        self.key ^= ZOBRIST.piece(sq, p);
     }
 
     pub fn remove_piece(&mut self, sq: u8) {
@@ -186,6 +191,7 @@ impl Position {
         self.pieces[side][px].clear(sq);
         self.occupied[side].clear(sq);
         self.board[sq as usize] = Piece::none();
+        self.key ^= ZOBRIST.piece(sq, p);
     }
 
     pub fn move_piece(&mut self, from: u8, to: u8) {
@@ -195,6 +201,7 @@ impl Position {
         self.occupied[side].clear(from);
         self.board[from as usize] = Piece::none();
         self.add_piece(side, px, to);
+        self.key ^= ZOBRIST.piece(from, p);
     }
 
     pub fn from_fen(fen: &str) -> Option<Self> {
@@ -232,6 +239,11 @@ impl Position {
             "-" => NS,
             ep => (ep.as_bytes()[0] - b'a' + (ep.as_bytes()[1] - b'1')*8) 
         };
+        inst.key ^= ZOBRIST.en_passant(inst.ep);
+        inst.key ^= ZOBRIST.castling(inst.cas);
+        if inst.turn == WHITE { inst.key ^= ZOBRIST.side(); }
+
+        inst.verify();
         Some(inst)
     }
 }

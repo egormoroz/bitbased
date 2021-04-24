@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 bitintr = "*"
 lazy_static = "*"
+rand = "*"
 
 [profile.release]
 opt-level = 3

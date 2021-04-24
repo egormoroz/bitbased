@@ -1,5 +1,6 @@
 extern crate bitintr;
 extern crate lazy_static;
+extern crate rand;
 
 pub mod game;
 use game::pos::*;
@@ -9,11 +10,14 @@ use std::io::{self, Write as IOWrite};
 
 pub fn perft_test() {
     use game::perft::*;
+    use game::zobrist::*;
     use std::time::SystemTime;
     lazy_static::initialize(&ATTK_TBL);
+    lazy_static::initialize(&ZOBRIST);
     let mut p = Position::from_fen(POSITIONS[1]).unwrap();
     let now = SystemTime::now();
-    println!("{}: {}", perft(&mut p, 5), now.elapsed().unwrap().as_secs_f64());
+    let n = perft(&mut p, 5);
+    println!("{} mil nodes/s", n as u128 / now.elapsed().unwrap().as_micros());
 }
 
  

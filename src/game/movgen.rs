@@ -335,12 +335,13 @@ impl Position {
             bb |= (pwns & !FILE_A) >> 9 | (pwns & !FILE_H) >> 7;
         }
         bb &= mask;
-        bb |= ATTK_TBL.knight_attacks(sq) & self.pieces[them][KNIGHTX];
         bb |= ATTK_TBL.king_attacks(sq) & self.pieces[them][KINGX];
+        bb |= ATTK_TBL.knight_attacks(sq) & self.pieces[them][KNIGHTX];
 
         let blockers = self.all_ocupied();
         let bp = ATTK_TBL.bishop_attacks(sq, blockers);
         let rk = ATTK_TBL.rook_attacks(sq, blockers);
+
         bb |= bp & self.pieces[them][BISHOPX] | rk & self.pieces[them][ROOKX];
         bb |= (bp | rk) & self.pieces[them][QUEENX];
         bb != 0
