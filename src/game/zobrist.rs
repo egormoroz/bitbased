@@ -1,5 +1,7 @@
 use crate::{rand, lazy_static::lazy_static};
 use super::{pos::*, defs::*};
+use rand::{Rng, SeedableRng};
+use rand::rngs::SmallRng;
 
 lazy_static! {
     pub static ref ZOBRIST: Zobrist = Zobrist::new();
@@ -14,8 +16,7 @@ pub struct Zobrist {
 
 impl Zobrist {
     pub fn new() -> Self {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = SmallRng::seed_from_u64(0xdeadbeef12345678);
         let mut inst = Zobrist {
             pckeys: [[0; 64]; 13],
             cskeys: [0; 16],

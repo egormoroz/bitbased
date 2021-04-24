@@ -28,7 +28,7 @@ pub fn perft(p: &mut Position, depth: u8) -> u64 {
 
     p.gen_moves(&mut moves);
     for m in moves.iter() {
-        if p.make_move(*m) {
+        if p.make_move(m.0) {
             nodes += perft(p, depth - 1);
             p.unmake_move();
         }
@@ -44,7 +44,7 @@ mod tests {
         super::perft(&mut Position::from_fen(POSITIONS[p]).unwrap(), depth as u8)
     }
 
-    const N: usize = 4;
+    const N: usize = 5;
 
     #[test]
     fn position_one() {

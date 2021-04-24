@@ -8,3 +8,6 @@ pub mod perft;
 pub mod magics;
 pub mod magic_table;
 pub mod zobrist;
+pub mod eval;
+pub mod pvtable;
+pub mod search;

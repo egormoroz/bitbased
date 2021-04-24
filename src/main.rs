@@ -1,10 +1,12 @@
 extern crate bitintr;
 extern crate lazy_static;
 extern crate rand;
+// extern crate static_init;
 
 pub mod game;
 use game::pos::*;
 use game::movgen::*;
+use game::search::*;
 
 use std::io::{self, Write as IOWrite};
 
@@ -22,8 +24,8 @@ pub fn perft_test() {
 
  
 fn main() {
-    perft_test();
-    let mut b = Position::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").unwrap();
+    // perft_test();
+    let mut b = Position::from_fen("r4r1k/1R1R2p1/7p/8/8/3Q1Ppq/P7/6K1 w - - 0 1").unwrap();
     let mut buf = String::new();
     let mut mbuf = String::with_capacity(8);
     let mut moves = MoveList::new();
@@ -35,6 +37,7 @@ fn main() {
         io::stdin().read_line(&mut buf).unwrap();
         match buf.trim() {
             "q" => break,
+            "s" => b.search(&mut SearchInfo::new(9, None)),
             "t" => { b.unmake_move(); continue; },
             _ => (),
         }
@@ -43,7 +46,7 @@ fn main() {
         b.gen_moves(&mut moves);
         let mut n = 0;
         for m in moves.iter() {
-            if b.make_move(*m) {
+            if b.make_move(m.0) {
                 b.unmake_move();
                 n += 1;
             }
@@ -54,10 +57,10 @@ fn main() {
         if let Some(fnd) = moves.iter().find(|m| {
             use std::fmt::Write;
             mbuf.clear();
-            write!(&mut mbuf, "{}", m).unwrap();
+            write!(&mut mbuf, "{}", m.0).unwrap();
             mbuf.trim() == buf
         }) {
-            b.make_move(*fnd);
+            b.make_move(fnd.0);
         }
     }
 }

@@ -7,8 +7,8 @@ impl Position {
     pub fn make_move(&mut self, m: Move) -> bool {
         // self.verify();
         let mut hist = Hist {
-            m, cap: self.board[m.to() as usize],
-            cas: self.cas, ep: self.ep
+            m, cap: self.board[m.to() as usize], cas: self.cas, 
+            ep: self.ep, fty: self.fty, key: self.key
         };
 
         let (f, t) = (m.from(), m.to());
@@ -44,6 +44,7 @@ impl Position {
             }
             if m.cap() {
                 self.remove_piece(t);
+                self.fty = 0;
             }
             self.move_piece(f, t);
 
@@ -54,9 +55,11 @@ impl Position {
             if f == 56 || t == 56 { self.cas.dis_queen(BLACK); }
             if f == 63 || t == 63 { self.cas.dis_king(BLACK); }
         }
+        self.fty *= (self.board[f as usize].get_type() != PAWN) as u8;
         self.ep = ep;
         self.hist[self.hist_ply as usize] = hist;
         self.hist_ply += 1;
+        self.ply += 1;
         self.turn ^= 1;
 
         self.key ^= ZOBRIST.castling(hist.cas) ^ ZOBRIST.castling(self.cas)
@@ -79,11 +82,10 @@ impl Position {
         let hist = self.hist[self.hist_ply as usize];
         let m  = hist.m;
         
-        self.key ^= ZOBRIST.castling(hist.cas) ^ ZOBRIST.castling(self.cas)
-            ^ ZOBRIST.side() ^ ZOBRIST.en_passant(hist.ep) ^ ZOBRIST.en_passant(self.ep);
-
+        self.fty = hist.fty;
         self.ep = hist.ep;
         self.cas = hist.cas;
+        self.ply -= 1;
 
         let (kind, f, t) = (m.kind(), m.from(), m.to());
         let turnx = self.turnx();
@@ -112,6 +114,8 @@ impl Position {
                 self.add_piece(turnx ^ 1, hist.cap.get_type() as usize, t);
             }
         }
+
+        self.key = hist.key;
         // self.verify();
     }
 }

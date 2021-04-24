@@ -1,4 +1,5 @@
 use super::{bitbrd::*, defs::*, movgen::*, zobrist::ZOBRIST};
+use super::pvtable::*;
 use std::{fmt, str::FromStr};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece(u8);
@@ -90,6 +91,8 @@ pub struct Hist {
     pub cas: CastlingPerm,
     pub cap: Piece,
     pub ep: u8,
+    pub fty: u8,
+    pub key: u64,
 }
 
 impl Hist {
@@ -99,6 +102,8 @@ impl Hist {
             cas: CastlingPerm::new(),
             cap: Piece::none(),
             ep: 255,
+            fty: 0,
+            key: 0,
         }
     }
 }
@@ -114,6 +119,11 @@ pub struct Position {
     pub turn: u8,
     pub cas: CastlingPerm,
     pub key: u64,
+
+    pub fty: u8,
+    pub ply: u16,
+    pub pv_line: PVLine,
+    pub pv_table: PVTable,
 }
 
 impl Position {
@@ -129,6 +139,11 @@ impl Position {
             turn: WHITE,
             cas: CastlingPerm::new(),
             key: 0,
+
+            fty: 0,
+            ply: 0,
+            pv_line: PVLine::new(),
+            pv_table: PVTable::new(),
         }
     }
 
@@ -243,7 +258,6 @@ impl Position {
         inst.key ^= ZOBRIST.castling(inst.cas);
         if inst.turn == WHITE { inst.key ^= ZOBRIST.side(); }
 
-        inst.verify();
         Some(inst)
     }
 }
@@ -268,7 +282,8 @@ impl fmt::Display for Position {
         for i in ['a','b','c','d','e','f', 'g', 'h'].iter() {
             write!(f, "{}  ", i)?;
         }
-        writeln!(f, "\nturn: {} cas: {} ep: {}", TURN[self.turn as usize], self.cas, self.ep)
+        writeln!(f, "\nturn: {} // cas: {} // ep: {} // eval: {}", 
+            TURN[self.turn as usize], self.cas, self.ep, self.eval())
     }
 }
 

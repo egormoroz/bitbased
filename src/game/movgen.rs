@@ -1,8 +1,13 @@
 use lazy_static::lazy_static;
 
-
 use super::{bitbrd::*, defs::*, pos::*, magic_table::*};
 use std::fmt;
+
+
+const CAPTURE_BASE: u16 = 10000;
+const PROM_BASE: u16 = 8000;
+// const KILLER_BASE_CUR: u16 = 5000;
+// const KILLER_BASE_PREV: u16 = 4500;
 
 lazy_static! {
     pub static ref ATTK_TBL: Box<AttackTable> = AttackTable::new();
@@ -17,6 +22,9 @@ impl KindBits {
 }
 
 #[derive(Clone, Copy)]
+pub struct OrderedMove(pub Move, pub u16);
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Move(u32);
 
 impl Move {
@@ -59,6 +67,7 @@ impl Move {
     pub fn cap(&self) -> bool { self.0 >> 31 != 0 }
 }
 
+
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}{}{}{}",
@@ -83,41 +92,87 @@ impl fmt::Display for Move {
 
 
 pub struct MoveList {
-    moves: [Move; MAX_MOVES],
+    moves: [OrderedMove; MAX_MOVES],
     n: usize,
+}
+
+pub struct PickyIter<'a> {
+    moves: &'a mut [OrderedMove],
+    n: usize,
+    k: usize,
+}
+
+impl<'a> PickyIter<'a> {
+    pub fn next(&mut self) -> Option<&OrderedMove> {
+        if self.k >= self.n { return None }
+        let (mut best_score, mut best_idx) = (0, self.k);
+        for i in self.k..self.n {
+            if self.moves[i].1 > best_score {
+                best_score = self.moves[i].1;
+                best_idx = i;
+            }
+        }
+        let k = self.k;
+        self.moves.swap(self.k, best_idx);
+        self.k += 1;
+        Some(&self.moves[k])
+    }
 }
 
 impl MoveList {
     pub fn new() -> Self {
         Self {
-            moves: [Move(0); 256],
+            moves: [OrderedMove(Move(0), 0); 256],
             n: 0,
         }
     }
 
-    pub fn iter(&self) -> std::slice::Iter<'_, Move> {
+    pub fn iter_picky(&mut self) -> PickyIter {
+        PickyIter {
+            moves: &mut self.moves,
+            n: self.n,
+            k: 0,
+        }
+    } 
+
+    pub fn iter(&self) -> std::slice::Iter<'_, OrderedMove> {
         self.moves[0..self.n].iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Move> {
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, OrderedMove> {
         self.moves[0..self.n].iter_mut()
     }
 
-    pub fn push(&mut self, m: Move) {
-        self.moves[self.n] = m;
+    pub fn push<const CAP: bool, const ATK: u8>(&mut self, m: Move, p: &Position) {
+        let score = if CAP {
+            let vic = p.board[m.to() as usize].get_type() as u16;
+            (vic + 1) * 100 + 6 - (ATK as u16+1) + CAPTURE_BASE
+        } else {
+            0
+        };
+        self.moves[self.n] = OrderedMove(m, score);
         self.n += 1;
+    }
+
+    pub fn push_prom<const CAP: bool, const PT: u8>(&mut self, m: Move, p: &Position) {
+        if CAP {
+            self.push::<true, PAWN>(m, p);
+        } else {
+            self.moves[self.n] = OrderedMove(m, PROM_BASE + PT as u16);
+            self.n += 1;
+        }
     }
 
     pub fn clear(&mut self) { self.n = 0; }
 
     pub fn len(&self) -> usize { self.n }
 
-    pub fn get(&self, idx: usize) -> &Move { 
+    pub fn get(&self, idx: usize) -> &OrderedMove { 
         debug_assert!(idx < self.n);
         &self.moves[idx]
     }
 
-    pub fn get_mut(&mut self, idx: usize) -> &mut Move {
+    pub fn get_mut(&mut self, idx: usize) -> &mut OrderedMove {
         debug_assert!(idx < self.n);
         &mut self.moves[idx]
     }
@@ -125,9 +180,10 @@ impl MoveList {
 
 impl Position {
     fn gen_proms<const CAP: bool>(&self, from: u8, to: u8, moves: &mut MoveList) {
-        for tp in KNIGHT..=QUEEN {
-            moves.push(Move::new_prom(from, to, CAP, tp))
-        }
+        moves.push_prom::<CAP, KNIGHT>(Move::new_prom(from, to, CAP, KNIGHT), self);
+        moves.push_prom::<CAP, BISHOP>(Move::new_prom(from, to, CAP, BISHOP), self);
+        moves.push_prom::<CAP, ROOK>(Move::new_prom(from, to, CAP, ROOK), self);
+        moves.push_prom::<CAP, QUEEN>(Move::new_prom(from, to, CAP, QUEEN), self);
     }
 
     fn gen_pawn_moves<const TURN: u8>(&self, moves: &mut MoveList) {
@@ -156,22 +212,22 @@ impl Position {
                 self.gen_proms::<true>(sq - 9, sq, moves);
             }
             for sq in shorts.bits() {
-                moves.push(Move::new_usual(sq - 8, sq, false))
+                moves.push::<false, PAWN>(Move::new_usual(sq - 8, sq, false), self)
             }
             for sq in longs.bits() {
-                moves.push(Move::new_long(sq - 16, sq));
+                moves.push::<false, PAWN>(Move::new_long(sq - 16, sq), self);
             }
             for sq in caps7.bits() {
-                moves.push(Move::new_usual(sq - 7, sq, true))
+                moves.push::<true, PAWN>(Move::new_usual(sq - 7, sq, true), self)
             }
             for sq in caps9.bits() {
-                moves.push(Move::new_usual(sq - 9, sq, true))
+                moves.push::<true, PAWN>(Move::new_usual(sq - 9, sq, true), self)
             }
 
             if self.ep != NS {
                 let b = ((1<<self.ep & !FILE_A) >> 9 | (1<<self.ep & !FILE_H) >> 7) & brd;
                 for sq in b.bits() {
-                    moves.push(Move::new_enpassant(sq, self.ep));
+                    moves.push::<false, PAWN>(Move::new_enpassant(sq, self.ep), self);
                 }
             }
         } else {
@@ -193,21 +249,21 @@ impl Position {
                 self.gen_proms::<true>(sq + 9, sq, moves);
             }
             for sq in shorts.bits() {
-                moves.push(Move::new_usual(sq + 8, sq, false))
+                moves.push::<false, PAWN>(Move::new_usual(sq + 8, sq, false), self)
             }
             for sq in longs.bits() {
-                moves.push(Move::new_long(sq + 16, sq));
+                moves.push::<false, PAWN>(Move::new_long(sq + 16, sq), self);
             }
             for sq in caps7.bits() {
-                moves.push(Move::new_usual(sq + 7, sq, true))
+                moves.push::<true, PAWN>(Move::new_usual(sq + 7, sq, true), self)
             }
             for sq in caps9.bits() {
-                moves.push(Move::new_usual(sq + 9, sq, true))
+                moves.push::<true, PAWN>(Move::new_usual(sq + 9, sq, true), self)
             }
             if self.ep != NS {
                 let b = ((1<<self.ep & !FILE_H) << 9 | (1<<self.ep & !FILE_A) << 7) & brd;
                 for sq in b.bits() {
-                    moves.push(Move::new_enpassant(sq, self.ep));
+                    moves.push::<false, PAWN>(Move::new_enpassant(sq, self.ep), self);
                 }
             }
         }
@@ -219,10 +275,10 @@ impl Position {
         for from in self.pieces[self.turn as usize][KINGX].bits() {
             let bb = ATTK_TBL.king_attacks(from as usize);
             for to in (bb & enemies).bits() {
-                moves.push(Move::new_usual(from, to, true));
+                moves.push::<true, KING>(Move::new_usual(from, to, true), self);
             }
             for to in (bb & free).bits() {
-                moves.push(Move::new_usual(from, to, false));
+                moves.push::<false, KING>(Move::new_usual(from, to, false), self);
             }
         }
     }
@@ -233,10 +289,10 @@ impl Position {
         for from in self.pieces[self.turn as usize][KNIGHTX].bits() {
             let bb = ATTK_TBL.knight_attacks(from as usize);
             for to in (bb & enemies).bits() {
-                moves.push(Move::new_usual(from, to, true));
+                moves.push::<true, KNIGHT>(Move::new_usual(from, to, true), self);
             }
             for to in (bb & free).bits() {
-                moves.push(Move::new_usual(from, to, false));
+                moves.push::<false, KNIGHT>(Move::new_usual(from, to, false), self); 
             }
         }
     }
@@ -248,10 +304,10 @@ impl Position {
         for from in self.pieces[self.turn as usize][BISHOPX].bits() {
             let bb = ATTK_TBL.bishop_attacks(from as usize, blockers);
             for to in (bb & enemies).bits() {
-                moves.push(Move::new_usual(from, to, true));
+                moves.push::<true, BISHOP>(Move::new_usual(from, to, true), self);
             }
             for to in (bb & free).bits() {
-                moves.push(Move::new_usual(from, to, false));
+                moves.push::<false, BISHOP>(Move::new_usual(from, to, false), self);
             }
         }
     }
@@ -263,10 +319,10 @@ impl Position {
         for from in self.pieces[self.turn as usize][ROOKX].bits() {
             let bb = ATTK_TBL.rook_attacks(from as usize, blockers);
             for to in (bb & enemies).bits() {
-                moves.push(Move::new_usual(from, to, true));
+                moves.push::<true, ROOK>(Move::new_usual(from, to, true), self);
             }
             for to in (bb & free).bits() {
-                moves.push(Move::new_usual(from, to, false));
+                moves.push::<false, ROOK>(Move::new_usual(from, to, false), self);
             }
         }
     }
@@ -279,10 +335,10 @@ impl Position {
             let bb = ATTK_TBL.bishop_attacks(from as usize, blockers)
                 | ATTK_TBL.rook_attacks(from as usize, blockers);
             for to in (bb & enemies).bits() {
-                moves.push(Move::new_usual(from, to, true));
+                moves.push::<true, QUEEN>(Move::new_usual(from, to, true), self);
             }
             for to in (bb & free).bits() {
-                moves.push(Move::new_usual(from, to, false));
+                moves.push::<false, QUEEN>(Move::new_usual(from, to, false), self);
             }
         }
     }
@@ -296,10 +352,10 @@ impl Position {
         let (f, tk) = KING_MOVE[TURN as usize];
         let tq = QUEEN_MOVE[TURN as usize].1;
         if self.cas.king(TURN) && b & KING_MASK[TURN as usize] == 0 {
-            moves.push(Move::new_castle(f, tk))
+            moves.push::<false, 0>(Move::new_castle(f, tk), self)
         }
         if self.cas.queen(TURN) && b & QUEEN_MASK[TURN as usize] == 0 {
-            moves.push(Move::new_castle(f, tq))
+            moves.push::<false, 0>(Move::new_castle(f, tq), self)
         }
     }
 
