@@ -26,7 +26,7 @@ pub fn perft(p: &mut Position, depth: u8) -> u64 {
     let mut moves = MoveList::new();
     let mut nodes = 0;
 
-    p.gen_moves(&mut moves);
+    p.gen_moves::<false>(&mut moves);
     for m in moves.iter() {
         if p.make_move(m.0) {
             nodes += perft(p, depth - 1);

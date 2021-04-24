@@ -102,9 +102,7 @@ impl Position {
 
     fn alpha_beta(&mut self, mut alpha: i32, beta: i32, depth: u8, info: &mut SearchInfo) -> i32 {
         if depth == 0 {
-            // return self.quiescence(alpha, beta, info);
-            info.nodes += 1;
-            return self.eval();
+            return self.quiescence(alpha, beta, info);
         }
 
         if info.checkup() { return 0; }
@@ -115,7 +113,7 @@ impl Position {
         if self.ply as usize >= MAX_DEPTH -1 { return self.eval() }
 
         let mut moves = MoveList::new();
-        self.gen_moves(&mut moves);
+        self.gen_moves::<false>(&mut moves);
         let mut legal = 0;
 
         if let Some(m) = self.pv_table.probe(self.key) {
@@ -166,7 +164,6 @@ impl Position {
         alpha
     }
 
-    /*
     fn quiescence(&mut self, mut alpha: i32, beta: i32, info: &mut SearchInfo) -> i32 {
         if info.checkup() { return 0; }
         info.nodes += 1;
@@ -179,14 +176,14 @@ impl Position {
         if score >= beta { return beta; }
         if score > alpha { alpha = score; }
 
-        let mut moves = MoveBuf::new();
-        self.gen_captures(&mut moves);
+        let mut moves = MoveList::new();
+        self.gen_moves::<true>(&mut moves);
         let (mut legal, old_alpha) = (0, alpha);
-        let mut best_move = Move::none();
+        let mut best_move = Move::new();
 
         let mut it = moves.iter_picky();
-        while let Some(m) = it.next() {
-            let m = m.m;
+        while let Some(om) = it.next() {
+            let m = om.0;
             if !self.make_move(m) { continue; }
             legal += 1;
             
@@ -213,5 +210,4 @@ impl Position {
 
         alpha
     }
-    */
 }

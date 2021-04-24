@@ -63,7 +63,7 @@ impl PVLine {
 impl Position {
     fn move_exists(&mut self, m: Move) -> bool {
         let mut moves = MoveList::new();
-        self.gen_moves(&mut moves);
+        self.gen_moves::<false>(&mut moves);
         for om in moves.iter() {
             if self.make_move(m) {
                 self.unmake_move();

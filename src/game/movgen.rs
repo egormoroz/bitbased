@@ -192,7 +192,7 @@ impl Position {
         moves.push_prom::<CAP, QUEEN>(Move::new_prom(from, to, CAP, QUEEN), self);
     }
 
-    fn gen_pawn_moves<const TURN: u8>(&self, moves: &mut MoveList) {
+    fn gen_pawn_moves<const TURN: u8, const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
         let brd = self.pieces[self.turn as usize][PAWNX];
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         let (r7, notr7) = (brd & RANK_7, brd & !RANK_7);
@@ -200,30 +200,33 @@ impl Position {
         let free = !self.all_ocupied();
 
         if TURN == WHITE {
-            let proms = (r7 << 8) & free;
             let promcaps7 = (r7 & !FILE_A) << 7 & enemies;
             let promcaps9 = (r7 & !FILE_H) << 9 & enemies;
-            let shorts = (notr7 << 8) & free;
-            let longs = (((r2 << 8) & free) << 8) & free;
             let caps7 = (notr7 & !FILE_A) << 7 & enemies;
             let caps9 = (notr7 & !FILE_H) << 9 & enemies;
 
-            for sq in proms.bits() {
-                self.gen_proms::<false>(sq - 8, sq, moves);
+            if !ONLY_CAPS {
+                let proms = (r7 << 8) & free;
+                let shorts = (notr7 << 8) & free;
+                let longs = (((r2 << 8) & free) << 8) & free;
+                for sq in proms.bits() {
+                    self.gen_proms::<false>(sq - 8, sq, moves);
+                }
+                for sq in shorts.bits() {
+                    moves.push::<false, PAWN>(Move::new_usual(sq - 8, sq, false), self)
+                }
+                for sq in longs.bits() {
+                    moves.push::<false, PAWN>(Move::new_long(sq - 16, sq), self);
+                }
             }
+
             for sq in promcaps7.bits() {
                 self.gen_proms::<true>(sq - 7, sq, moves);
             }
             for sq in promcaps9.bits() {
                 self.gen_proms::<true>(sq - 9, sq, moves);
             }
-            for sq in shorts.bits() {
-                moves.push::<false, PAWN>(Move::new_usual(sq - 8, sq, false), self)
-            }
-            for sq in longs.bits() {
-                moves.push::<false, PAWN>(Move::new_long(sq - 16, sq), self);
-            }
-            for sq in caps7.bits() {
+                        for sq in caps7.bits() {
                 moves.push::<true, PAWN>(Move::new_usual(sq - 7, sq, true), self)
             }
             for sq in caps9.bits() {
@@ -237,28 +240,31 @@ impl Position {
                 }
             }
         } else {
-            let proms = (r2 >> 8) & free;
             let promcaps7 = (r2 & !FILE_H) >> 7 & enemies;
             let promcaps9 = (r2 & !FILE_A) >> 9 & enemies;
-            let shorts = (notr2 >> 8) & free;
-            let longs = ((r7 >> 8) & free) >> 8 & free;
             let caps7 = (notr2 & !FILE_H) >> 7 & enemies;
             let caps9 = (notr2 & !FILE_A) >> 9 & enemies;
 
-            for sq in proms.bits() {
-                self.gen_proms::<false>(sq + 8, sq, moves);
+            if !ONLY_CAPS {
+                let proms = (r2 >> 8) & free;
+                let shorts = (notr2 >> 8) & free;
+                let longs = ((r7 >> 8) & free) >> 8 & free;
+                for sq in proms.bits() {
+                    self.gen_proms::<false>(sq + 8, sq, moves);
+                }
+                for sq in shorts.bits() {
+                    moves.push::<false, PAWN>(Move::new_usual(sq + 8, sq, false), self)
+                }
+                for sq in longs.bits() {
+                    moves.push::<false, PAWN>(Move::new_long(sq + 16, sq), self);
+                }
             }
+
             for sq in promcaps7.bits() {
                 self.gen_proms::<true>(sq + 7, sq, moves);
             }
             for sq in promcaps9.bits() {
                 self.gen_proms::<true>(sq + 9, sq, moves);
-            }
-            for sq in shorts.bits() {
-                moves.push::<false, PAWN>(Move::new_usual(sq + 8, sq, false), self)
-            }
-            for sq in longs.bits() {
-                moves.push::<false, PAWN>(Move::new_long(sq + 16, sq), self);
             }
             for sq in caps7.bits() {
                 moves.push::<true, PAWN>(Move::new_usual(sq + 7, sq, true), self)
@@ -275,7 +281,7 @@ impl Position {
         }
     }
 
-    pub fn gen_king_moves(&self, moves: &mut MoveList) {
+    pub fn gen_king_moves<const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
         let free  = !self.all_ocupied();
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][KINGX].bits() {
@@ -283,13 +289,15 @@ impl Position {
             for to in (bb & enemies).bits() {
                 moves.push::<true, KING>(Move::new_usual(from, to, true), self);
             }
-            for to in (bb & free).bits() {
-                moves.push::<false, KING>(Move::new_usual(from, to, false), self);
+            if !ONLY_CAPS {
+                for to in (bb & free).bits() {
+                    moves.push::<false, KING>(Move::new_usual(from, to, false), self);
+                }
             }
         }
     }
 
-    pub fn gen_knight_moves(&self, moves: &mut MoveList) {
+    pub fn gen_knight_moves<const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
         let free  = !self.all_ocupied();
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][KNIGHTX].bits() {
@@ -297,13 +305,15 @@ impl Position {
             for to in (bb & enemies).bits() {
                 moves.push::<true, KNIGHT>(Move::new_usual(from, to, true), self);
             }
-            for to in (bb & free).bits() {
-                moves.push::<false, KNIGHT>(Move::new_usual(from, to, false), self); 
+            if !ONLY_CAPS {
+                for to in (bb & free).bits() {
+                    moves.push::<false, KNIGHT>(Move::new_usual(from, to, false), self); 
+                }
             }
         }
     }
 
-    pub fn gen_bishop_moves(&self, moves: &mut MoveList) {
+    pub fn gen_bishop_moves<const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
         let blockers = self.all_ocupied();
         let free  = !blockers;
         let enemies = self.occupied[(self.turn ^ 1) as usize];
@@ -312,13 +322,15 @@ impl Position {
             for to in (bb & enemies).bits() {
                 moves.push::<true, BISHOP>(Move::new_usual(from, to, true), self);
             }
-            for to in (bb & free).bits() {
-                moves.push::<false, BISHOP>(Move::new_usual(from, to, false), self);
+            if !ONLY_CAPS {
+                for to in (bb & free).bits() {
+                    moves.push::<false, BISHOP>(Move::new_usual(from, to, false), self);
+                }
             }
         }
     }
 
-    pub fn gen_rook_moves(&self, moves: &mut MoveList) {
+    pub fn gen_rook_moves<const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
         let blockers = self.all_ocupied();
         let free  = !blockers;
         let enemies = self.occupied[(self.turn ^ 1) as usize];
@@ -327,13 +339,15 @@ impl Position {
             for to in (bb & enemies).bits() {
                 moves.push::<true, ROOK>(Move::new_usual(from, to, true), self);
             }
-            for to in (bb & free).bits() {
-                moves.push::<false, ROOK>(Move::new_usual(from, to, false), self);
+            if !ONLY_CAPS {
+                for to in (bb & free).bits() {
+                    moves.push::<false, ROOK>(Move::new_usual(from, to, false), self);
+                }
             }
         }
     }
 
-    pub fn gen_queen_moves(&self, moves: &mut MoveList) {
+    pub fn gen_queen_moves<const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
         let blockers = self.all_ocupied();
         let free  = !blockers;
         let enemies = self.occupied[(self.turn ^ 1) as usize];
@@ -343,8 +357,10 @@ impl Position {
             for to in (bb & enemies).bits() {
                 moves.push::<true, QUEEN>(Move::new_usual(from, to, true), self);
             }
-            for to in (bb & free).bits() {
-                moves.push::<false, QUEEN>(Move::new_usual(from, to, false), self);
+            if !ONLY_CAPS {
+                for to in (bb & free).bits() {
+                    moves.push::<false, QUEEN>(Move::new_usual(from, to, false), self);
+                }
             }
         }
     }
@@ -366,17 +382,17 @@ impl Position {
     }
 
 
-    pub fn gen_moves(&self, moves: &mut MoveList) {
-        self.gen_knight_moves(moves);
-        self.gen_bishop_moves(moves);
-        self.gen_rook_moves(moves);
-        self.gen_queen_moves(moves);
-        self.gen_king_moves(moves);
+    pub fn gen_moves<const ONLY_CAPS: bool>(&self, moves: &mut MoveList) {
+        self.gen_knight_moves::<ONLY_CAPS>(moves);
+        self.gen_bishop_moves::<ONLY_CAPS>(moves);
+        self.gen_rook_moves::<ONLY_CAPS>(moves);
+        self.gen_queen_moves::<ONLY_CAPS>(moves);
+        self.gen_king_moves::<ONLY_CAPS>(moves);
         if self.turn == WHITE {
-            self.gen_pawn_moves::<WHITE>(moves);
+            self.gen_pawn_moves::<WHITE, ONLY_CAPS>(moves);
             self.gen_castling_moves::<WHITE>(moves);
         } else {
-            self.gen_pawn_moves::<BLACK>(moves);
+            self.gen_pawn_moves::<BLACK, ONLY_CAPS>(moves);
             self.gen_castling_moves::<BLACK>(moves);
         }
     }

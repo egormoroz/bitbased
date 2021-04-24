@@ -43,7 +43,7 @@ fn main() {
         }
 
         moves.clear();
-        b.gen_moves(&mut moves);
+        b.gen_moves::<false>(&mut moves);
         let mut n = 0;
         for m in moves.iter() {
             if b.make_move(m.0) {
