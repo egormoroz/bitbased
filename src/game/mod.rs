@@ -11,3 +11,4 @@ pub mod zobrist;
 pub mod eval;
 pub mod pvtable;
 pub mod search;
+pub mod uci;

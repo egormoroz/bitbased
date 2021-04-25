@@ -2,7 +2,7 @@ use super::movgen::*;
 use super::pos::*;
 use std::collections::HashMap;
 
-// pub const MAX_ENTRIES: u64 = 1024*1024;
+// pub const NUM_ENTRIES: u64 = 1024*1024;
 pub const MAX_DEPTH: usize = 64;
 
 pub struct PVTable {
@@ -13,19 +13,27 @@ pub struct PVTable {
 impl PVTable {
     pub fn new() -> Self {
         Self {
-            entries: HashMap::with_capacity(1024*32),
+            entries: HashMap::with_capacity(1024),
+            // entries: vec![(0, Move::new()); NUM_ENTRIES as usize],
         }
     }
 
     pub fn clear(&mut self) {
         self.entries.clear();
+        // for i in self.entries.iter_mut() {
+            // *i = (0, Move::new());
+        // }
     }
 
     pub fn store(&mut self, pk: u64, m: Move) {
         self.entries.insert(pk, m);
+        // self.entries[(pk % NUM_ENTRIES) as usize] = (pk, m);
     }
 
     pub fn probe(&self, pk: u64) -> Option<Move> {
+        // let e = &self.entries[(pk % NUM_ENTRIES) as usize];
+        // if e.0 == pk { Some(e.1) }
+        // else { None }
         self.entries.get(&pk).and_then(|m|Some(*m))
     }
 }
@@ -73,13 +81,15 @@ impl Position {
         false
     }
 
-    pub fn extract_pv_line(&mut self, depth: u8) {
+    pub fn extract_pv_line(&mut self, mut depth: u8) {
         debug_assert!((depth as usize) < MAX_DEPTH);
         self.pv_line.clear();
         while let Some(m) = self.pv_table.probe(self.key) {
             if !self.move_exists(m) { break }
             self.make_move(m);
             self.pv_line.push(m);
+            if depth <= 1 { break }
+            depth -= 1;
         }
 
         for _ in 0..self.pv_line.n {

@@ -1,7 +1,7 @@
 use super::{pos::*, movgen::*, pvtable::*};
 use std::time::{SystemTime, Duration};
 
-const INFINITY: i32 = i32::MAX;
+const INFINITY: i32 = 30000;
 const CHECKUP_INTERVAL_MASK: u32 = 0xFFF;
 
 pub struct SearchInfo {
@@ -47,7 +47,7 @@ impl SearchInfo {
 }
 
 impl Position {
-    fn is_repetition(&self) -> bool {
+    pub fn is_repetition(&self) -> bool {
         for i in self.hist_ply as usize - self.fty as usize..self.hist_ply as usize{
             if self.key == self.hist[i].key {
                 return true
@@ -57,7 +57,6 @@ impl Position {
     }
 
     pub fn search_reset(&mut self) {
-        /*
         for i in self.search_hist.iter_mut() {
             for j in i.iter_mut() {
                 *j = 0;
@@ -65,10 +64,9 @@ impl Position {
         }
         for i in self.search_killers.iter_mut() {
             for j in i.iter_mut() {
-                *j = Move::none();
+                *j = Move::new();
             }
         }
-        */
 
         self.pv_table.clear();
         self.ply = 0;
@@ -101,6 +99,7 @@ impl Position {
     }
 
     fn alpha_beta(&mut self, mut alpha: i32, beta: i32, depth: u8, info: &mut SearchInfo) -> i32 {
+        if self.is_repetition() || self.fty >= 100 { return 0; }
         if depth == 0 {
             return self.quiescence(alpha, beta, info);
         }
@@ -109,10 +108,11 @@ impl Position {
 
         info.nodes += 1;
 
-        if self.is_repetition() || self.fty >= 100 { return 0; }
-        if self.ply as usize >= MAX_DEPTH -1 { return self.eval() }
+        if self.ply as usize >= MAX_DEPTH { return self.eval() }
 
         let mut moves = MoveList::new();
+        let mut best_move = Move::new();
+        let old_alpha = alpha;
         self.gen_moves::<false>(&mut moves);
         let mut legal = 0;
 
@@ -126,10 +126,12 @@ impl Position {
         while let Some(m) = it.next() {
             let m = m.0;
             if !self.make_move(m) { continue; }
+            self.ply += 1;
             legal += 1;
             
             let score = -self.alpha_beta(-beta, -alpha, depth-1, info);
             self.unmake_move();
+            self.ply -= 1;
 
             if score > alpha {
                 if score >= beta {
@@ -143,10 +145,12 @@ impl Position {
                         self.search_killers[0][self.ply as usize] = m;
                     }
 
+                    //this move caused beta cut-off, so it gotta be good
+                    self.store_pv_move(m);
                     return beta;
                 }
                 alpha = score;
-                self.store_pv_move(m);
+                best_move = m;
 
                 if !m.cap() {
                     self.search_hist[self.board[m.from() as usize].id() as usize][m.to() as usize] += depth as u16;
@@ -161,6 +165,10 @@ impl Position {
             }
         }
 
+        if alpha != old_alpha {
+            self.store_pv_move(best_move);
+        }
+
         alpha
     }
 
@@ -168,8 +176,8 @@ impl Position {
         if info.checkup() { return 0; }
         info.nodes += 1;
 
-        if self.is_repetition() || self.fty >= 100 { return 0; }
-        if self.ply as usize >= MAX_DEPTH -1 { return self.eval() }
+        // if self.is_repetition() || self.fty >= 100 { return 0; }
+        if self.ply as usize >= MAX_DEPTH  { return self.eval() }
 
 
         let score = self.eval();
@@ -185,10 +193,12 @@ impl Position {
         while let Some(om) = it.next() {
             let m = om.0;
             if !self.make_move(m) { continue; }
+            self.ply += 1;
             legal += 1;
             
             let score = -self.quiescence(-beta, -alpha, info);
             self.unmake_move();
+            self.ply -= 1;
 
             if score > alpha {
                 if score >= beta {
@@ -197,6 +207,7 @@ impl Position {
                     }
                     info.fh += 1.;
 
+                    self.store_pv_move(m);
                     return beta;
                 }
                 alpha = score;

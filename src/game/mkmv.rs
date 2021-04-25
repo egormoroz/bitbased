@@ -22,6 +22,7 @@ impl Position {
             hist.cap = self.board[sq as usize];
             self.remove_piece(sq);
             self.move_piece(f, t);
+            self.fty = 0;
         } else if kind.castle() {
             let atk = self.attacked(turnx ^ 1);
             if t > f {
@@ -33,14 +34,18 @@ impl Position {
                 self.do_castling(f, t);
                 // if self.turn == WHITE { println!("{}", self); }
             }
+            self.fty += 1;
         } else if kind.long_push() {
             self.move_piece(f, t);
             if self.turn == WHITE { ep = f + 8; }
             else { ep = t + 8; }
+            self.fty = 0;
         } else {
+            self.fty += 1;
             if m.prom() != 0 {
                 self.remove_piece(f);
                 self.add_piece(turnx, m.prom() as usize, f);
+                self.fty = 0;
             }
             if m.cap() {
                 self.remove_piece(t);
@@ -55,11 +60,9 @@ impl Position {
             if f == 56 || t == 56 { self.cas.dis_queen(BLACK); }
             if f == 63 || t == 63 { self.cas.dis_king(BLACK); }
         }
-        self.fty *= (self.board[f as usize].get_type() != PAWN) as u8;
         self.ep = ep;
         self.hist[self.hist_ply as usize] = hist;
         self.hist_ply += 1;
-        self.ply += 1;
         self.turn ^= 1;
 
         self.key ^= ZOBRIST.castling(hist.cas) ^ ZOBRIST.castling(self.cas)
@@ -85,7 +88,6 @@ impl Position {
         self.fty = hist.fty;
         self.ep = hist.ep;
         self.cas = hist.cas;
-        self.ply -= 1;
 
         let (kind, f, t) = (m.kind(), m.from(), m.to());
         let turnx = self.turnx();

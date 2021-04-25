@@ -260,6 +260,10 @@ impl Position {
             "-" => NS,
             ep => (ep.as_bytes()[0] - b'a' + (ep.as_bytes()[1] - b'1')*8) 
         };
+        inst.fty = ss.next()
+            .and_then(|s|s.parse::<u8>().ok())
+            .unwrap_or(0);
+
         inst.key ^= ZOBRIST.en_passant(inst.ep);
         inst.key ^= ZOBRIST.castling(inst.cas);
         if inst.turn == WHITE { inst.key ^= ZOBRIST.side(); }
@@ -288,8 +292,8 @@ impl fmt::Display for Position {
         for i in ['a','b','c','d','e','f', 'g', 'h'].iter() {
             write!(f, "{}  ", i)?;
         }
-        writeln!(f, "\nturn: {} // cas: {} // ep: {} // eval: {}", 
-            TURN[self.turn as usize], self.cas, self.ep, self.eval())
+        writeln!(f, "\nturn: {} // cas: {} // ep: {} // fty: {} //eval: {}", 
+            TURN[self.turn as usize], self.cas, self.ep, self.fty, self.eval())
     }
 }
 
