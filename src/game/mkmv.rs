@@ -4,6 +4,34 @@ const KING_MASK: [u64; 2] = [ 7 << 4, 7 << 60 ]; //TODO: Check this!
 const QUEEN_MASK: [u64; 2] = [ 7 << 2, 7 << 58 ]; //and this!
 
 impl Position {
+    pub fn make_null_move(&mut self) { 
+        // self.verify();
+        let hist = Hist {
+            m: Move::new(), cap: Piece::none(), cas: self.cas, 
+            ep: self.ep, fty: self.fty, key: self.key
+        };
+        self.hist[self.hist_ply as usize] = hist;
+        self.turn ^= 1; 
+        self.hist_ply += 1;
+        self.ply += 1;
+        self.ep = NS;
+        self.key ^= ZOBRIST.side() ^ ZOBRIST.en_passant(hist.ep) ^ ZOBRIST.en_passant(NS);
+        // self.verify();
+    }
+
+    pub fn unmake_null_move(&mut self) { 
+        // self.verify();
+        self.hist_ply -= 1;
+        self.ply -= 1;
+        self.turn ^= 1;
+        let hist = &self.hist[self.hist_ply as usize];
+        self.key = hist.key;
+        self.cas = hist.cas;
+        self.fty = hist.fty;
+        self.ep = hist.ep;
+        // self.verify();
+    }
+
     pub fn make_move(&mut self, m: Move) -> bool {
         // self.verify();
         let mut hist = Hist {

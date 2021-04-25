@@ -10,23 +10,13 @@ use game::search::*;
 use game::uci;
 
 use std::io::{self, Write as IOWrite};
-
-pub fn perft_test() {
-    use game::perft::*;
-    use game::zobrist::*;
-    use std::time::SystemTime;
-    lazy_static::initialize(&ATTK_TBL);
-    lazy_static::initialize(&ZOBRIST);
-    let mut p = Position::from_fen(POSITIONS[1]).unwrap();
-    let now = SystemTime::now();
-    let n = perft(&mut p, 5);
-    println!("{} mil nodes/s", n as u128 / now.elapsed().unwrap().as_micros());
-}
-
  
 fn main() {
+    use game::perft::POSITIONS;
     // perft_test();
-    let mut b = Position::from_fen("r4r1k/1R1R2p1/7p/8/8/3Q1Ppq/P7/6K1 w - - 0 1").unwrap();
+    // let mut b = Position::from_fen("r4r1k/1R1R2p1/7p/8/8/3Q1Ppq/P7/6K1 w - - 0 1").unwrap();
+    let mut b = Position::new();
+    b.load_fen(POSITIONS[0]);
     let mut buf = String::new();
     let mut mbuf = String::with_capacity(8);
     let mut moves = MoveList::new();
@@ -38,10 +28,15 @@ fn main() {
         io::stdin().read_line(&mut buf).unwrap();
         match buf.trim() {
             "q" => break,
-            "s" => b.search(&mut SearchInfo::new(8, None)),
+            "s" => b.search(&mut SearchInfo::new(10, None)),
             "t" => { b.unmake_move(); continue; },
             "uci" => uci::UCI::new().uci_loop(),
-            "r" => { println!("{}", b.is_repetition()) }
+            "r" => { println!("{}", b.is_repetition()) },
+            "fen" => {
+                buf.clear();
+                io::stdin().read_line(&mut buf).unwrap();
+                b.load_fen(buf.trim());
+            }
             _ => (),
         }
 

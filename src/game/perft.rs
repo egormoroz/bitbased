@@ -41,7 +41,9 @@ pub fn perft(p: &mut Position, depth: u8) -> u64 {
 mod tests {
     use super::*;
     fn perft(p: usize, depth: usize) -> u64 {
-        super::perft(&mut Position::from_fen(POSITIONS[p]).unwrap(), depth as u8)
+        let mut pos = Position::new();
+        pos.load_fen(POSITIONS[p]);
+        super::perft(&mut pos, depth as u8)
     }
 
     const N: usize = 5;

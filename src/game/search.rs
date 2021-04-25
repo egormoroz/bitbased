@@ -1,16 +1,16 @@
 use super::{pos::*, movgen::*, pvtable::*};
 use std::{fmt, time::{SystemTime, Duration}};
 
-const INFINITY: i32 = i32::MAX;
-const CHECKUP_INTERVAL_MASK: u32 = 0xFFF;
+const INFINITY: i16 = i16::MAX;
+const CHECKUP_INTERVAL_MASK: u32 = 2047;
 
-struct Score(i32);
+struct Score(i16);
 
 impl fmt::Display for Score {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 > INFINITY / 2 {
+        if self.0 > INFINITY - 100 {
             write!(f, "mate {}", (INFINITY - self.0 + 1) / 2)
-        } else if self.0 < -INFINITY / 2 {
+        } else if self.0 < -INFINITY + 100 {
             write!(f, "mate {}", (self.0 + INFINITY - 1) / 2)
         } else {
             write!(f, "cp {}", self.0)
@@ -82,14 +82,14 @@ impl Position {
             }
         }
 
-        self.pv_table.clear();
+        // self.pv_table.clear();
         self.ply = 0;
     }
 
     pub fn search(&mut self, info: &mut SearchInfo) {
         self.search_reset();
         for depth in 1..=info.depth {
-            let best_score = self.alpha_beta(-INFINITY, INFINITY, depth, info);
+            let best_score = self.alpha_beta(-INFINITY, INFINITY, depth, info, true);
 
             if info.stopped { break; }
 
@@ -112,27 +112,54 @@ impl Position {
         }
     }
 
-    fn alpha_beta(&mut self, mut alpha: i32, beta: i32, depth: u8, info: &mut SearchInfo) -> i32 {
-        if self.is_repetition() || self.fty >= 100 { return 0; }
+    fn alpha_beta(&mut self, mut alpha: i16, beta: i16, mut depth: u8, info: &mut SearchInfo, null: bool) -> i16 {
+        if self.ply > 0 && self.is_repetition() || self.fty >= 100 { return 0; }
         if depth == 0 {
             return self.quiescence(alpha, beta, info);
         }
 
         if info.checkup() { return 0; }
-
+        if self.ply as usize >= MAX_DEPTH { return self.eval() }
         info.nodes += 1;
 
-        if self.ply as usize >= MAX_DEPTH { return self.eval() }
+        let in_check = self.in_check(self.turnx());
+        if in_check {
+            depth += 1;
+        }
 
-        let mut moves = MoveList::new();
+        const R: u8 = 3;
+        if null && !in_check && depth > R {
+            self.make_null_move();
+            let score = -self.alpha_beta(-beta, -beta+1, depth - 1 - R, info, false);
+            self.unmake_null_move();
+            if score >= beta {
+                return beta;
+            }
+        }
+
+        let mut pv_move = Move::new();
+        if let Some(e) = self.pv_table.probe(self.key) {
+            if e.depth >= depth {
+                use EntryFlags::*;
+                match e.flags {
+                    Exact => return e.score,
+                    Alpha if e.score <= alpha => return alpha,
+                    Beta if e.score >= beta => return beta,
+                    _ => (),
+                }
+            }
+            pv_move = e.m;
+        }
+
         let mut best_move = Move::new();
+        let mut best_score = -INFINITY;
         let old_alpha = alpha;
-        self.gen_moves::<false>(&mut moves);
         let mut legal = 0;
-
-        if let Some(m) = self.pv_table.probe(self.key) {
-            if let Some(pv_move) = moves.iter_mut().find(|om|om.0 == m) {
-                pv_move.1 = u16::MAX;
+        let mut moves = MoveList::new();
+        self.gen_moves::<false>(&mut moves);
+        if !pv_move.is_null() {
+            if let Some(fnd) = moves.iter_mut().find(|om|om.0 == pv_move) {
+                fnd.1 = u16::MAX;
             }
         }
 
@@ -143,50 +170,62 @@ impl Position {
             self.ply += 1;
             legal += 1;
             
-            let score = -self.alpha_beta(-beta, -alpha, depth-1, info);
+            let score = -self.alpha_beta(-beta, -alpha, depth-1, info, true);
             self.unmake_move();
             self.ply -= 1;
 
-            if score > alpha {
-                if score >= beta {
-                    if legal == 1 {
-                        info.fhf += 1.;
+            if info.stopped { return 0 }
+
+            if score > best_score {
+                best_score = score;
+                best_move = m;
+                if score > alpha {
+                    if score >= beta {
+                        if legal == 1 {
+                            info.fhf += 1.;
+                        }
+                        info.fh += 1.;
+
+                        if !m.cap() {
+                            self.search_killers[1][self.ply as usize] = self.search_killers[0][self.ply as usize];
+                            self.search_killers[0][self.ply as usize] = m;
+                        }
+
+                        self.pv_table.store(self.key, HashEntry {
+                            depth, flags: EntryFlags::Beta, m, score: beta
+                        });
+                        return beta;
                     }
-                    info.fh += 1.;
+                    alpha = score;
 
                     if !m.cap() {
-                        self.search_killers[1][self.ply as usize] = self.search_killers[0][self.ply as usize];
-                        self.search_killers[0][self.ply as usize] = m;
+                        self.search_hist[self.board[m.from() as usize].id() as usize][m.to() as usize] += depth as u16;
                     }
-
-                    //this move caused beta cut-off, so it gotta be good
-                    self.store_pv_move(m);
-                    return beta;
-                }
-                alpha = score;
-                best_move = m;
-
-                if !m.cap() {
-                    self.search_hist[self.board[m.from() as usize].id() as usize][m.to() as usize] += depth as u16;
                 }
             }
         }
 
         if legal == 0 {
             return match self.in_check(self.turnx()) {
-                true => -INFINITY + self.ply as i32,
+                true => -INFINITY + self.ply as i16,
                 false => 0,
             }
         }
 
         if alpha != old_alpha {
-            self.store_pv_move(best_move);
+            self.pv_table.store(self.key, HashEntry {
+                depth, flags: EntryFlags::Exact, m: best_move, score: best_score
+            })
+        } else {
+            self.pv_table.store(self.key, HashEntry {
+                depth, flags: EntryFlags::Alpha, m: best_move, score: alpha
+            })
         }
 
         alpha
     }
 
-    fn quiescence(&mut self, mut alpha: i32, beta: i32, info: &mut SearchInfo) -> i32 {
+    fn quiescence(&mut self, mut alpha: i16, beta: i16, info: &mut SearchInfo) -> i16 {
         if info.checkup() { return 0; }
         info.nodes += 1;
 
@@ -200,8 +239,7 @@ impl Position {
 
         let mut moves = MoveList::new();
         self.gen_moves::<true>(&mut moves);
-        let (mut legal, old_alpha) = (0, alpha);
-        let mut best_move = Move::new();
+        let mut legal = 0;
 
         let mut it = moves.iter_picky();
         while let Some(om) = it.next() {
@@ -214,6 +252,8 @@ impl Position {
             self.unmake_move();
             self.ply -= 1;
 
+            if info.stopped { return 0 }
+
             if score > alpha {
                 if score >= beta {
                     if legal == 1 {
@@ -221,17 +261,16 @@ impl Position {
                     }
                     info.fh += 1.;
 
-                    self.store_pv_move(m);
+                    // self.store_pv_move(m);
                     return beta;
                 }
                 alpha = score;
-                best_move = m;
             }
         }
 
-        if alpha != old_alpha {
-            self.store_pv_move(best_move);
-        }
+        // if alpha != old_alpha {
+            // self.store_pv_move(best_move);
+        // }
 
         alpha
     }

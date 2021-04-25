@@ -20,14 +20,12 @@ pub const BLACK: u8 = 1;
 pub const BLACKX: usize = 1;
 
 
+pub const FILE_A: u64 = 0x101010101010101;
+
 pub const RANK_2: u64 = 0xFF << 8;
-pub const RANK_4: u64 = 0xFF << 24;
-pub const RANK_5: u64 = 0xFF << 32;
 pub const RANK_7: u64 = 0xFF << 48;
 
 pub const FILE_H: u64 = 0x8080808080808080;
-pub const FILE_A: u64 = 0x101010101010101;
-pub const FILE_B: u64 = 0x4040404040404040;
 pub const FILE_G: u64 = 0x101010101010101;
 
 pub const PAWN_LOOKUP: bool = false;

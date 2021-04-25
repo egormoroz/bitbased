@@ -65,6 +65,8 @@ impl Move {
     }
     pub fn prom(&self) -> u8 { (self.0 >> 24 & 0b111) as u8 }
     pub fn cap(&self) -> bool { self.0 >> 31 != 0 }
+
+    pub fn is_null(&self) -> bool { self.0 == 0 }
 }
 
 
@@ -121,8 +123,10 @@ impl<'a> PickyIter<'a> {
 
 impl MoveList {
     pub fn new() -> Self {
+        use std::mem::MaybeUninit;
         Self {
-            moves: [OrderedMove(Move(0), 0); 256],
+            moves: unsafe { MaybeUninit::uninit().assume_init() },
+            // moves: [PriorityMove::default(); 256],
             n: 0,
         }
     }

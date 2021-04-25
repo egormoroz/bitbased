@@ -51,6 +51,10 @@ impl CastlingPerm {
         self.dis_queen(c)
     }
 
+    pub fn any(&self, c: u8) -> bool {
+        self.king(c) || self.queen(c)
+    }
+
     pub fn id(&self) -> u8 { self.0 }
 }
 
@@ -123,7 +127,7 @@ pub struct Position {
     pub fty: u8,
     pub ply: u16,
     pub pv_line: PVLine,
-    pub pv_table: PVTable,
+    pub pv_table: HashTable,
 
     pub search_hist: [[u16; 64]; 12],
     pub search_killers: [[Move; MAX_DEPTH]; 2],
@@ -146,7 +150,7 @@ impl Position {
             fty: 0,
             ply: 0,
             pv_line: PVLine::new(),
-            pv_table: PVTable::new(),
+            pv_table: HashTable::new(),
 
             search_hist: [[0; 64]; 12],
             search_killers: [[Move::new(); MAX_DEPTH]; 2],
@@ -225,12 +229,32 @@ impl Position {
         self.key ^= ZOBRIST.piece(from, p);
     }
 
-    pub fn from_fen(fen: &str) -> Option<Self> {
-        let mut inst = Self::new();
+    pub fn reset(&mut self) {
+        for p in self.board.iter_mut() {
+            *p = Piece::none();
+        }
+        for c in WHITEX..=BLACKX {
+            for p in PAWNX..=KINGX {
+                self.pieces[c][p] = 0;
+            }
+            self.occupied[c] = 0;
+        }
+        self.hist_ply = 0;
+        self.ep = NS;
+        self.turn = WHITE;
+        self.cas = CastlingPerm::new();
+        self.key = 0;
+        self.fty = 0;
+        self.ply = 0;
+        //the rest is cleared automatically by search()
+    }
+
+    pub fn load_fen(&mut self, fen: &str) {
+        self.reset();
         let mut ss = fen.split_whitespace();
         let (mut rank, mut file) = (7, 0);
 
-        for ch in ss.next()?.chars() {
+        for ch in ss.next().unwrap().chars() {
             let c = ch.is_lowercase() as usize;
             let sq = rank * 8 + file;
             let px = match ch.to_ascii_lowercase() {
@@ -244,31 +268,29 @@ impl Position {
                 ' ' => break,
                 c if c.is_digit(9) && c != '0' 
                     => { file += c.to_digit(9).unwrap() as u8; continue; }
-                _ => return None,
+                ch => panic!("unexpected char in fen string {}", ch),
 
             };
-            inst.add_piece(c, px, sq);
+            self.add_piece(c, px, sq);
             file += 1;
         }
-        inst.turn = match ss.next()? {
+        self.turn = match ss.next().unwrap() {
             "w" => WHITE,
             "b" => BLACK,
-            _ => return None,
+            _ => panic!("invalid side character"),
         };
-        inst.cas = CastlingPerm::from_str(ss.next()?).ok()?;
-        inst.ep = match ss.next()? {
+        self.cas = CastlingPerm::from_str(ss.next().unwrap()).unwrap();
+        self.ep = match ss.next().unwrap() {
             "-" => NS,
             ep => (ep.as_bytes()[0] - b'a' + (ep.as_bytes()[1] - b'1')*8) 
         };
-        inst.fty = ss.next()
+        self.fty = ss.next()
             .and_then(|s|s.parse::<u8>().ok())
             .unwrap_or(0);
 
-        inst.key ^= ZOBRIST.en_passant(inst.ep);
-        inst.key ^= ZOBRIST.castling(inst.cas);
-        if inst.turn == WHITE { inst.key ^= ZOBRIST.side(); }
-
-        Some(inst)
+        self.key ^= ZOBRIST.en_passant(self.ep);
+        self.key ^= ZOBRIST.castling(self.cas);
+        if self.turn == WHITE { self.key ^= ZOBRIST.side(); }
     }
 }
 

@@ -47,9 +47,9 @@ impl UCI {
     fn parse_position(&mut self, line: &str) {
         let opt = line.split_whitespace().next().unwrap();
         if let Some(fen) = line.strip_prefix("fen") {
-            self.pos = Position::from_fen(fen).unwrap();
+            self.pos.load_fen(fen);
         } else if opt == "startpos" {
-            self.pos = Position::from_fen(START_FEN).unwrap();
+            self.pos.load_fen(START_FEN);
         } else {
             panic!("invalid command {}", line);
         }
