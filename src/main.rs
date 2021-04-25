@@ -26,7 +26,7 @@ pub fn perft_test() {
  
 fn main() {
     // perft_test();
-    let mut b = Position::from_fen("8/8/8/8/8/k7/8/2K5 w - - 0 1").unwrap();
+    let mut b = Position::from_fen("r4r1k/1R1R2p1/7p/8/8/3Q1Ppq/P7/6K1 w - - 0 1").unwrap();
     let mut buf = String::new();
     let mut mbuf = String::with_capacity(8);
     let mut moves = MoveList::new();
@@ -38,7 +38,7 @@ fn main() {
         io::stdin().read_line(&mut buf).unwrap();
         match buf.trim() {
             "q" => break,
-            "s" => b.search(&mut SearchInfo::new(1, None)),
+            "s" => b.search(&mut SearchInfo::new(8, None)),
             "t" => { b.unmake_move(); continue; },
             "uci" => uci::UCI::new().uci_loop(),
             "r" => { println!("{}", b.is_repetition()) }

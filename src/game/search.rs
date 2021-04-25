@@ -1,8 +1,22 @@
 use super::{pos::*, movgen::*, pvtable::*};
-use std::time::{SystemTime, Duration};
+use std::{fmt, time::{SystemTime, Duration}};
 
-const INFINITY: i32 = 30000;
+const INFINITY: i32 = i32::MAX;
 const CHECKUP_INTERVAL_MASK: u32 = 0xFFF;
+
+struct Score(i32);
+
+impl fmt::Display for Score {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0 > INFINITY / 2 {
+            write!(f, "mate {}", (INFINITY - self.0 + 1) / 2)
+        } else if self.0 < -INFINITY / 2 {
+            write!(f, "mate {}", (self.0 + INFINITY - 1) / 2)
+        } else {
+            write!(f, "cp {}", self.0)
+        }
+    }
+}
 
 pub struct SearchInfo {
     start_time: SystemTime,
@@ -81,8 +95,8 @@ impl Position {
 
             let ellapsed = info.start_time.elapsed().unwrap().as_millis();
 
-            print!("info score cp {} depth {} nodes {} time {}",
-                     best_score, depth, info.nodes, ellapsed);
+            print!("info score {} depth {} nodes {} time {}",
+                     Score(best_score), depth, info.nodes, ellapsed);
 
             print!(" pv");
             self.extract_pv_line(depth);
