@@ -131,6 +131,7 @@ pub struct Position {
 
     pub search_hist: [[u16; 64]; 12],
     pub search_killers: [[Move; MAX_DEPTH]; 2],
+    pub counter_moves: [[Move; 64]; 64],
 
     pub material: [i16; 2],
 }
@@ -156,8 +157,16 @@ impl Position {
 
             search_hist: [[0; 64]; 12],
             search_killers: [[Move::new(); MAX_DEPTH]; 2],
+            counter_moves: [[Move::new(); 64]; 64],
 
             material: [0; 2],
+        }
+    }
+
+    pub fn previous_move(&self) -> Move {
+        match self.hist_ply {
+            0 => Move::new(),
+            idx => self.hist[idx as usize].m
         }
     }
 

@@ -86,6 +86,8 @@ const PASSED_PAWN_SCORE: [i16; 8] = [
     0, 5, 10, 20, 35, 60, 100, 200
 ];
 
+// const MOBILITY_MULT: i16 = 1;
+
 const ISOLATED_PAWN_PENALTY: i16 = -5;
 const DOUBLE_PAWN_PENALTY: i16 = -5;
 
@@ -141,19 +143,40 @@ fn widen(gen: u64) -> u64 {
 }
 
 fn wking_shield(k: u64) -> u64 {
-    k & RANK[0] | RANK[1] | RANK[2]
+    north_one(widen(k))
 }
 
 fn bking_shield(k: u64) -> u64 {
-    k & RANK[7] | RANK[6] | RANK[5]
+    south_one(widen(k))
 }
 
-const ADVANCED: bool = true;
 
 impl Position {
+    fn is_material_draw(&self) -> bool {
+        let wbs = self.pieces[WHITEX][BISHOPX].count_ones();
+        let bbs = self.pieces[BLACKX][BISHOPX].count_ones();
+        let wns = self.pieces[WHITEX][KNIGHTX].count_ones();
+        let bns = self.pieces[BLACKX][KNIGHTX].count_ones();
+
+        if (self.pieces[WHITEX][ROOKX] | self.pieces[WHITEX][QUEENX]
+            | self.pieces[BLACKX][ROOKX] | self.pieces[BLACKX][QUEENX] 
+            | self.pieces[WHITEX][PAWNX] | self.pieces[BLACKX][PAWNX]) == 0 {
+            return false;
+        }
+        if wbs == 0 && bbs == 0 {
+            if wns < 3 && bns < 3 { return true }
+        } else if wns == 0 && bns == 0 {
+            if (wbs as i32 - bbs as i32).abs() < 2 { return true }
+        } else if wns < 3 && wbs == 0 || wbs == 1 && wns == 0 {
+            if bns < 3 && bbs == 0 || bbs == 1 && bns == 0 { return true }
+        }
+        false
+    }
+
     pub fn eval(&self) -> i16 {
         // let mat_white = self.material(WHITEX);
         // let mat_black = self.material(BLACKX);
+        // if self.is_material_draw() { return 0 }
         let mat_white = self.material[WHITEX];
         let mat_black = self.material[BLACKX];
         let mat_diff = mat_white - mat_black;
@@ -169,6 +192,9 @@ impl Position {
                 score -= LOCATION_TABLE[tp as usize][(sq ^ 56) as usize] as i16;
             }
         }
+
+        // score += MOBILITY_MULT * self.mobility::<WHITEX>() as i16;
+        // score -= MOBILITY_MULT * self.mobility::<BLACKX>() as i16;
 
         //pawns
         let (wps, bps) = (self.pieces[WHITEX][PAWNX], self.pieces[BLACKX][PAWNX]);
@@ -187,10 +213,8 @@ impl Position {
         score += DOUBLE_PAWN_PENALTY * (wfront & wps).count_ones() as i16;
         score -= DOUBLE_PAWN_PENALTY * (bfront & bps).count_ones() as i16;
 
-        if ADVANCED {
-            score += ISOLATED_PAWN_PENALTY * isolanis(wps).count_ones() as i16;
-            score -= ISOLATED_PAWN_PENALTY * isolanis(bps).count_ones() as i16;
-        }
+        score += ISOLATED_PAWN_PENALTY * isolanis(wps).count_ones() as i16;
+        score -= ISOLATED_PAWN_PENALTY * isolanis(bps).count_ones() as i16;
 
         //rooks
         let occupied = self.all_ocupied();

@@ -83,7 +83,7 @@ impl UCI {
             BLACK => "binc",
             _ => unreachable!(),
         }).unwrap_or(&0);
-        let mut movestogo = *opts.get("movestogo").unwrap_or(&50);
+        let mut movestogo = *opts.get("movestogo").unwrap_or(&55);
         let depth = *opts.get("depth").unwrap_or(&(MAX_DEPTH as i32));
         if let Some(mt) = opts.get("movetime") {
             time = *mt;
@@ -93,13 +93,13 @@ impl UCI {
         let mut info = SearchInfo::new(
             depth as u8,
             if time != -1 {
-                Some(Duration::from_millis((time / movestogo + inc - 50) as u64))
+                Some(Duration::from_millis((time / movestogo + inc - 500) as u64))
             } else {
                 None
             }
         );
         self.pos.search(&mut info);
-        println!("{}", self.pos);
+        // println!("{}", self.pos);
     }
 
     fn make_move(&mut self, m: &str) {

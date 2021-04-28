@@ -28,7 +28,7 @@ fn main() {
         io::stdin().read_line(&mut buf).unwrap();
         match buf.trim() {
             "q" => break,
-            "s" => b.search(&mut SearchInfo::new(14, None)),
+            "s" => b.search(&mut SearchInfo::new(16, None)),
             "t" => { b.unmake_move(); continue; },
             "uci" => { 
                 uci::UCI::new(b).uci_loop();

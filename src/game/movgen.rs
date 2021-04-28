@@ -289,7 +289,7 @@ impl Position {
         let free  = !self.all_ocupied();
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][KINGX].bits() {
-            let bb = ATTK_TBL.king_attacks(from as usize);
+            let bb = ATTK_TBL.king_attacks(from);
             for to in (bb & enemies).bits() {
                 moves.push::<true, KING>(Move::new_usual(from, to, true), self);
             }
@@ -305,7 +305,7 @@ impl Position {
         let free  = !self.all_ocupied();
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][KNIGHTX].bits() {
-            let bb = ATTK_TBL.knight_attacks(from as usize);
+            let bb = ATTK_TBL.knight_attacks(from);
             for to in (bb & enemies).bits() {
                 moves.push::<true, KNIGHT>(Move::new_usual(from, to, true), self);
             }
@@ -322,7 +322,7 @@ impl Position {
         let free  = !blockers;
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][BISHOPX].bits() {
-            let bb = ATTK_TBL.bishop_attacks(from as usize, blockers);
+            let bb = ATTK_TBL.bishop_attacks(from, blockers);
             for to in (bb & enemies).bits() {
                 moves.push::<true, BISHOP>(Move::new_usual(from, to, true), self);
             }
@@ -339,7 +339,7 @@ impl Position {
         let free  = !blockers;
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][ROOKX].bits() {
-            let bb = ATTK_TBL.rook_attacks(from as usize, blockers);
+            let bb = ATTK_TBL.rook_attacks(from, blockers);
             for to in (bb & enemies).bits() {
                 moves.push::<true, ROOK>(Move::new_usual(from, to, true), self);
             }
@@ -356,8 +356,8 @@ impl Position {
         let free  = !blockers;
         let enemies = self.occupied[(self.turn ^ 1) as usize];
         for from in self.pieces[self.turn as usize][QUEENX].bits() {
-            let bb = ATTK_TBL.bishop_attacks(from as usize, blockers)
-                | ATTK_TBL.rook_attacks(from as usize, blockers);
+            let bb = ATTK_TBL.bishop_attacks(from, blockers)
+                | ATTK_TBL.rook_attacks(from, blockers);
             for to in (bb & enemies).bits() {
                 moves.push::<true, QUEEN>(Move::new_usual(from, to, true), self);
             }
@@ -406,7 +406,7 @@ impl Position {
     pub fn in_check(&self, us: usize) -> bool {
         let them = us ^ 1;
         let mask = self.pieces[us][KINGX];
-        let sq = mask.trailing_zeros() as usize;
+        let sq = mask.trailing_zeros() as u8;
         let mut bb = 0;
 
         if them == WHITEX {
@@ -440,23 +440,48 @@ impl Position {
         }
 
         for sq in self.pieces[sidex][KNIGHTX].bits() {
-            bb |= ATTK_TBL.knight_attacks(sq as usize);
+            bb |= ATTK_TBL.knight_attacks(sq);
         }
         for sq in self.pieces[sidex][KINGX].bits() {
-            bb |= ATTK_TBL.king_attacks(sq as usize);
+            bb |= ATTK_TBL.king_attacks(sq);
         }
         let blockers = self.all_ocupied();
         for sq in self.pieces[sidex][BISHOPX].bits() {
-            bb |= ATTK_TBL.bishop_attacks(sq as usize, blockers);
+            bb |= ATTK_TBL.bishop_attacks(sq, blockers);
         }
         for sq in self.pieces[sidex][ROOKX].bits() {
-            bb |= ATTK_TBL.rook_attacks(sq as usize, blockers);
+            bb |= ATTK_TBL.rook_attacks(sq, blockers);
         }
         for sq in self.pieces[sidex][QUEENX].bits() {
-            bb |= ATTK_TBL.bishop_attacks(sq as usize, blockers);
-            bb |= ATTK_TBL.rook_attacks(sq as usize, blockers);
+            bb |= ATTK_TBL.bishop_attacks(sq, blockers);
+            bb |= ATTK_TBL.rook_attacks(sq, blockers);
         }
 
         bb
+    }
+
+    pub fn mobility<const COLOR: usize>(&self) -> u8 {
+        let knights = self.pieces[COLOR][KNIGHTX];
+        let my_pieces = self.occupied[COLOR];
+        let l1 = (knights >> 1) & 0x7f7f7f7f7f7f7f7f;
+        let l2 = (knights >> 2) & 0x3f3f3f3f3f3f3f3f;
+        let r1 = (knights << 1) & 0xfefefefefefefefe;
+        let r2 = (knights << 2) & 0xfcfcfcfcfcfcfcfc;
+        let h1 = l1 | r1;
+        let h2 = l2 | r2;
+        let mut n = (((h1<<16) | (h1>>16) | (h2<<8) | (h2>>8)) & !my_pieces).count_ones();
+        let blockers = self.all_ocupied();
+        for sq in self.pieces[COLOR][BISHOPX].bits() {
+            n += ATTK_TBL.bishop_attacks(sq, blockers).count_ones();
+        }
+        for sq in self.pieces[COLOR][ROOKX].bits() {
+            n += ATTK_TBL.rook_attacks(sq, blockers).count_ones();
+        }
+        for sq in self.pieces[COLOR][QUEENX].bits() {
+            n += ATTK_TBL.bishop_attacks(sq, blockers).count_ones();
+            n += ATTK_TBL.rook_attacks(sq, blockers).count_ones();
+        }
+
+        n as u8
     }
 }

@@ -70,6 +70,12 @@ impl Position {
         false
     }
 
+    pub fn should_null_move(&self) -> bool {
+        use super::defs::*;
+        let side = self.turnx();
+        self.occupied[side] & !self.pieces[side][PAWNX] & !self.pieces[side][KINGX] != 0
+    }
+
     pub fn search_reset(&mut self) {
         for i in self.search_hist.iter_mut() {
             for j in i.iter_mut() {
@@ -120,6 +126,10 @@ impl Position {
     }
 
     fn alpha_beta(&mut self, mut alpha: i16, beta: i16, mut depth: u8, info: &mut SearchInfo, mut do_null: bool) -> i16 {
+        const FULL_DEPTH_MOVES: u8 = 4;
+        const REDUCTION_LIMIT: u8 = 3;
+        const DO_RAZORING: bool = true;
+
         if self.ply > 0 && self.is_repetition() || self.fty >= 100 { return 0; }
         if depth == 0 {
             return self.quiescence(alpha, beta, info);
@@ -152,7 +162,7 @@ impl Position {
         }
 
         const R: u8 = 3;
-        if do_null && !in_check && depth > R && !self.is_endgame() {
+        if do_null && !in_check && depth > R && self.should_null_move() {
             self.make_null_move();
             let score = -self.alpha_beta(-beta, -beta+1, depth - 1 - R, info, false);
             self.unmake_null_move();
@@ -173,8 +183,22 @@ impl Position {
             }
         }
 
-        const FULL_DEPTH_MOVES: u8 = 4;
-        const REDUCTION_LIMIT: u8 = 3;
+        if DO_RAZORING && pv_move.is_null() && !in_check && depth <= 3 {
+            let mut score = self.eval() + 125;
+            if score < beta {
+                if depth == 1 {
+                    return score.max(self.quiescence(alpha, beta, info));
+                }
+                score += 175;
+                if score < beta && depth <= 2 {
+                    let new_score = self.quiescence(alpha, beta, info);
+                    if new_score < beta {
+                        return new_score.max(score);
+                    }
+                }
+            }
+        }
+
         let mut moves_searched = 0;
 
         let mut it = moves.iter_picky();
@@ -262,7 +286,7 @@ impl Position {
         if info.checkup() { return 0; }
         info.nodes += 1;
 
-        // if self.is_repetition() || self.fty >= 100 { return 0; }
+        // self.is_repetition() || self.fty >= 100 { return 0; }
         if self.ply as usize >= MAX_DEPTH  { return self.eval() }
 
 

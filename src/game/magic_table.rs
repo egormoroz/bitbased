@@ -151,20 +151,22 @@ impl AttackTable {
         inst
     }
 
-    pub fn rook_attacks(&self, sq: usize, blockers: BitBoard) -> BitBoard {
+    pub fn rook_attacks(&self, sq: u8, blockers: BitBoard) -> BitBoard {
+        let sq = sq as usize;
         let m = &ROOK_MAGICS[sq];
         let idx = (m.factor.wrapping_mul(blockers & m.mask) >> (64-12)) as usize + m.offset;
         self.attacks[idx]
     }
 
-    pub fn bishop_attacks(&self, sq: usize, blockers: BitBoard) -> BitBoard {
+    pub fn bishop_attacks(&self, sq: u8, blockers: BitBoard) -> BitBoard {
+        let sq = sq as usize;
         let m = &BISHOP_MAGICS[sq];
         let idx = (m.factor.wrapping_mul(blockers & m.mask) >> (64-9)) as usize + m.offset;
         self.attacks[idx]
     }
 
-    pub fn knight_attacks(&self, sq: usize) -> BitBoard { self.knights[sq] }
-    pub fn king_attacks(&self, sq: usize) -> BitBoard { self.kings[sq] }
+    pub fn knight_attacks(&self, sq: u8) -> BitBoard { self.knights[sq as usize] }
+    pub fn king_attacks(&self, sq: u8) -> BitBoard { self.kings[sq as usize] }
 }
 
 // #[test]
