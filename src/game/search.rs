@@ -88,16 +88,22 @@ impl Position {
 
     pub fn search(&mut self, info: &mut SearchInfo) {
         self.search_reset();
+        const WINDOW: i16 = 50;
+        let (mut alpha, mut beta) = (-INFINITY, INFINITY);
         for depth in 1..=info.depth {
-	    info.nodes = 0;
-            let best_score = self.alpha_beta(-INFINITY, INFINITY, depth, info, true);
-
+    	    info.nodes = 0;
+            let mut score = self.alpha_beta(alpha, beta, depth, info, true);
+            if score <= alpha || score >= beta {
+                score = self.alpha_beta(-INFINITY, INFINITY, depth, info, true);
+            }
             if info.stopped { break; }
+            alpha = score - WINDOW;
+            beta = score + WINDOW;
 
             let ellapsed = info.start_time.elapsed().unwrap().as_millis();
 
             print!("info score {} depth {} nodes {} time {}",
-                     Score(best_score), depth, info.nodes, ellapsed);
+                     Score(score), depth, info.nodes, ellapsed);
 
             print!(" pv");
             self.extract_pv_line(depth);
@@ -113,7 +119,7 @@ impl Position {
         }
     }
 
-    fn alpha_beta(&mut self, mut alpha: i16, beta: i16, mut depth: u8, info: &mut SearchInfo, null: bool) -> i16 {
+    fn alpha_beta(&mut self, mut alpha: i16, beta: i16, mut depth: u8, info: &mut SearchInfo, mut do_null: bool) -> i16 {
         if self.ply > 0 && self.is_repetition() || self.fty >= 100 { return 0; }
         if depth == 0 {
             return self.quiescence(alpha, beta, info);
@@ -128,16 +134,6 @@ impl Position {
             depth += 1;
         }
 
-        const R: u8 = 3;
-        if null && !in_check && depth > R && !self.is_endgame() {
-            self.make_null_move();
-            let score = -self.alpha_beta(-beta, -beta+1, depth - 1 - R, info, false);
-            self.unmake_null_move();
-            if score >= beta {
-                return beta;
-            }
-        }
-
         let mut pv_move = Move::new();
         if let Some(e) = self.pv_table.probe(self.key) {
             if e.depth >= depth {
@@ -149,7 +145,20 @@ impl Position {
                     _ => (),
                 }
             }
+            if e.score < beta {
+                do_null = false;
+            }
             pv_move = e.m;
+        }
+
+        const R: u8 = 3;
+        if do_null && !in_check && depth > R && !self.is_endgame() {
+            self.make_null_move();
+            let score = -self.alpha_beta(-beta, -beta+1, depth - 1 - R, info, false);
+            self.unmake_null_move();
+            if score >= beta {
+                return beta;
+            }
         }
 
         let mut best_move = Move::new();

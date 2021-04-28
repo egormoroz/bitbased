@@ -48,6 +48,11 @@ impl HashTable {
     }
 
     pub fn store(&mut self, pk: u64, e: HashEntry) {
+        if let Some(old) = self.probe(pk) {
+            if old.depth > e.depth {
+                return;
+            }
+        }
         self.entries[(pk % NUM_ENTRIES) as usize] = (pk, e);
         // self.entries.insert(pk, e);
     }
