@@ -95,7 +95,7 @@ impl Position {
         let mut moves = MoveList::new();
         self.gen_moves::<false>(&mut moves);
         for om in moves.iter() {
-            if self.make_move(m) {
+            if self.make_move(om.0) {
                 self.unmake_move();
                 if om.0 == m { return true }
             }

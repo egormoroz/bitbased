@@ -89,6 +89,7 @@ impl Position {
     pub fn search(&mut self, info: &mut SearchInfo) {
         self.search_reset();
         for depth in 1..=info.depth {
+	    info.nodes = 0;
             let best_score = self.alpha_beta(-INFINITY, INFINITY, depth, info, true);
 
             if info.stopped { break; }
@@ -128,7 +129,7 @@ impl Position {
         }
 
         const R: u8 = 3;
-        if null && !in_check && depth > R {
+        if null && !in_check && depth > R && !self.is_endgame() {
             self.make_null_move();
             let score = -self.alpha_beta(-beta, -beta+1, depth - 1 - R, info, false);
             self.unmake_null_move();
@@ -163,14 +164,36 @@ impl Position {
             }
         }
 
+        const FULL_DEPTH_MOVES: u8 = 4;
+        const REDUCTION_LIMIT: u8 = 3;
+        let mut moves_searched = 0;
+
         let mut it = moves.iter_picky();
         while let Some(m) = it.next() {
             let m = m.0;
             if !self.make_move(m) { continue; }
             self.ply += 1;
             legal += 1;
+
+            let score = if moves_searched == 0 {
+                -self.alpha_beta(-beta, -alpha, depth-1, info, true)
+            } else {
+                let mut score;
+                if moves_searched >= FULL_DEPTH_MOVES && depth >= REDUCTION_LIMIT
+                    && !in_check && !m.cap() && m.prom() == 0 {
+                    score = -self.alpha_beta(-alpha-1, -alpha, depth-2, info, true);
+                } else {
+                    score = alpha + 1;
+                }
+                if score > alpha {
+                    score = -self.alpha_beta(-alpha-1, -alpha, depth-1, info, true);
+                    if score > alpha && score < beta {
+                        score = -self.alpha_beta(-beta, -alpha, depth-1, info, true);
+                    }
+                }
+                score
+            };
             
-            let score = -self.alpha_beta(-beta, -alpha, depth-1, info, true);
             self.unmake_move();
             self.ply -= 1;
 
@@ -203,6 +226,7 @@ impl Position {
                     }
                 }
             }
+            moves_searched += 1;
         }
 
         if legal == 0 {

@@ -131,6 +131,8 @@ pub struct Position {
 
     pub search_hist: [[u16; 64]; 12],
     pub search_killers: [[Move; MAX_DEPTH]; 2],
+
+    pub material: [i16; 2],
 }
 
 impl Position {
@@ -154,6 +156,8 @@ impl Position {
 
             search_hist: [[0; 64]; 12],
             search_killers: [[Move::new(); MAX_DEPTH]; 2],
+
+            material: [0; 2],
         }
     }
 
@@ -207,6 +211,7 @@ impl Position {
         self.board[sq as usize] = p;
         self.occupied[side].set(sq);
         self.pieces[side][px].set(sq);
+        self.material[side] += MATERIAL_TABLE[px];
         self.key ^= ZOBRIST.piece(sq, p);
     }
 
@@ -216,6 +221,7 @@ impl Position {
         self.pieces[side][px].clear(sq);
         self.occupied[side].clear(sq);
         self.board[sq as usize] = Piece::none();
+        self.material[side] -= MATERIAL_TABLE[px];
         self.key ^= ZOBRIST.piece(sq, p);
     }
 
@@ -225,8 +231,11 @@ impl Position {
         self.pieces[side][px].clear(from);
         self.occupied[side].clear(from);
         self.board[from as usize] = Piece::none();
-        self.add_piece(side, px, to);
+        self.board[to as usize] = p;
+        self.occupied[side].set(to);
+        self.pieces[side][px].set(to);
         self.key ^= ZOBRIST.piece(from, p);
+        self.key ^= ZOBRIST.piece(to, p);
     }
 
     pub fn reset(&mut self) {
@@ -246,6 +255,7 @@ impl Position {
         self.key = 0;
         self.fty = 0;
         self.ply = 0;
+        self.material = [0; 2];
         //the rest is cleared automatically by search()
     }
 

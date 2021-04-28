@@ -32,9 +32,13 @@ pub const PAWN_LOOKUP: bool = false;
 pub const KNIGHT_LOOKUP: bool = false;
 pub const KING_LOOKUP: bool = false;
 
-pub const MAX_HIST: usize = 256;
+pub const MAX_HIST: usize = 1024;
 pub const MAX_MOVES: usize = 256;
 pub const NS: u8 = 255;
+
+pub const MATERIAL_TABLE: [i16; 6] = [ 100, 325, 325, 550, 1000, 0 ];
+
+pub const INFINITY: i16 = i16::MAX;
 
 pub fn piece_id(tp: u8, clr: u8) -> u8 {
     tp << 1 | clr

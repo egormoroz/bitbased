@@ -86,8 +86,8 @@ const PASSED_PAWN_SCORE: [i16; 8] = [
     0, 5, 10, 20, 35, 60, 100, 200
 ];
 
-const ISOLATED_PAWN_PENALTY: i16 = -10;
-const DOUBLE_PAWN_PENALTY: i16 = -10;
+const ISOLATED_PAWN_PENALTY: i16 = -5;
+const DOUBLE_PAWN_PENALTY: i16 = -5;
 
 const ROOK_OPEN_FILE: i16 = 5; 
 const ROOK_SEMI_OPEN_FILE: i16 = 5;
@@ -96,7 +96,7 @@ const QUEEN_SEMI_OPEN_FILE: i16 = 2;
 
 const CASTLE_PERM_SCORE: i16 = 10;
 
-const MATERIAL_TABLE: [i16; 5] = [ 100, 325, 325, 550, 1000 ];
+const BISHOP_PAIR: i16 = 30;
 
 const ENDGAME_THRESHOLD: i16 
     = MATERIAL_TABLE[PAWNX] * 2
@@ -140,34 +140,22 @@ fn widen(gen: u64) -> u64 {
     gen | (gen & !FILE[0]) >> 1 | (gen & !FILE[7]) << 1
 }
 
-fn wking_shield(mut k: u64) -> u64 {
-    k &= RANK[0] | RANK[1] | RANK[2];
-    k |= k << 7;
-    k |= k << 8;
-    k |= k << 9;
-    k
+fn wking_shield(k: u64) -> u64 {
+    k & RANK[0] | RANK[1] | RANK[2]
 }
 
-fn bking_shield(mut k: u64) -> u64 {
-    k &= RANK[7] | RANK[6] | RANK[5];
-    k |= k >> 7;
-    k |= k >> 8;
-    k |= k >> 9;
-    k
+fn bking_shield(k: u64) -> u64 {
+    k & RANK[7] | RANK[6] | RANK[5]
 }
+
+const ADVANCED: bool = true;
 
 impl Position {
-    fn material(&self, sidex: usize) -> i16 {
-        let mut s = 0;
-        for tp in PAWNX..KINGX {
-            s += (self.pieces[sidex][tp].count_ones() as i16) * MATERIAL_TABLE[tp];
-        }
-        s
-    }
-
     pub fn eval(&self) -> i16 {
-        let mat_white = self.material(WHITEX);
-        let mat_black = self.material(BLACKX);
+        // let mat_white = self.material(WHITEX);
+        // let mat_black = self.material(BLACKX);
+        let mat_white = self.material[WHITEX];
+        let mat_black = self.material[BLACKX];
         let mat_diff = mat_white - mat_black;
         let max_mat = mat_white.max(mat_black);
 
@@ -199,8 +187,10 @@ impl Position {
         score += DOUBLE_PAWN_PENALTY * (wfront & wps).count_ones() as i16;
         score -= DOUBLE_PAWN_PENALTY * (bfront & bps).count_ones() as i16;
 
-        score += ISOLATED_PAWN_PENALTY * isolanis(wps).count_ones() as i16;
-        score -= ISOLATED_PAWN_PENALTY * isolanis(bps).count_ones() as i16;
+        if ADVANCED {
+            score += ISOLATED_PAWN_PENALTY * isolanis(wps).count_ones() as i16;
+            score -= ISOLATED_PAWN_PENALTY * isolanis(bps).count_ones() as i16;
+        }
 
         //rooks
         let occupied = self.all_ocupied();
@@ -228,9 +218,9 @@ impl Position {
         
         
         let wking_tactic = ((mat_white - mat_black >= SAFE_THRESHOLD) 
-            && max_mat <= ENDGAME_THRESHOLD) as usize;
+            && self.is_endgame()) as usize;
         let bking_tactic = ((mat_black - mat_white >= SAFE_THRESHOLD) 
-            && max_mat <= ENDGAME_THRESHOLD) as usize;
+            && self.is_endgame()) as usize;
 
         let wk = self.pieces[WHITEX][KINGX].trailing_zeros() as usize;
         let bk = self.pieces[BLACKX][KINGX].trailing_zeros() as usize;
@@ -248,7 +238,14 @@ impl Position {
             score -= KING_SHIELDED * (bking_shield(bkmask) & bps).count_ones() as i16;
         }
 
+        score += BISHOP_PAIR * (self.pieces[WHITEX][BISHOPX].count_ones() >= 2) as i16;
+        score -= BISHOP_PAIR * (self.pieces[BLACKX][BISHOPX].count_ones() >= 2) as i16;
+
         if self.turn == BLACK { score *= -1; }
         score
+    }
+
+    pub fn is_endgame(&self) -> bool {
+        self.material[WHITEX].min(self.material[BLACKX]) < ENDGAME_THRESHOLD
     }
 }

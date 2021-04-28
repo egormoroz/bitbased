@@ -28,9 +28,12 @@ fn main() {
         io::stdin().read_line(&mut buf).unwrap();
         match buf.trim() {
             "q" => break,
-            "s" => b.search(&mut SearchInfo::new(10, None)),
+            "s" => b.search(&mut SearchInfo::new(12, None)),
             "t" => { b.unmake_move(); continue; },
-            "uci" => uci::UCI::new().uci_loop(),
+            "uci" => { 
+                uci::UCI::new(b).uci_loop();
+                return
+            }
             "r" => { println!("{}", b.is_repetition()) },
             "fen" => {
                 buf.clear();

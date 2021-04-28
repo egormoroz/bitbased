@@ -10,8 +10,8 @@ pub struct UCI {
 }
 
 impl UCI {
-    pub fn new() -> Self {
-        Self { pos: Position::new() }
+    pub fn new(pos: Position) -> Self {
+        Self { pos }
     }
 
     pub fn uci_loop(&mut self) {
@@ -83,7 +83,7 @@ impl UCI {
             BLACK => "binc",
             _ => unreachable!(),
         }).unwrap_or(&0);
-        let mut movestogo = *opts.get("movestogo").unwrap_or(&30);
+        let mut movestogo = *opts.get("movestogo").unwrap_or(&50);
         let depth = *opts.get("depth").unwrap_or(&(MAX_DEPTH as i32));
         if let Some(mt) = opts.get("movetime") {
             time = *mt;
